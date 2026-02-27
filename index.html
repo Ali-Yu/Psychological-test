@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mach-IV 心理测评报告</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Chart.js 用于生成专业图表 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f7f6f2; /* 日系米白色底 */
+            color: #333333;
+        }
+
+        .serif {
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .fade-enter-from { opacity: 0; transform: translateY(10px); }
+        .fade-leave-to { opacity: 0; transform: translateY(-10px); }
+
+        /* 极简按钮效果 */
+        .option-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .option-btn:hover {
+            background-color: #fff;
+            padding-left: 1.5rem;
+            border-color: #333;
+        }
+
+        [v-cloak] { display: none; }
+
+        /* 自定义进度条 */
+        .progress-line {
+            height: 1px;
+            background: #e5e5e5;
+            position: relative;
+        }
+        .progress-fill {
+            height: 1px;
+            background: #333;
+            transition: width 0.6s ease;
+        }
+
+        /* 卡密弹窗样式 */
+        .auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: #f7f6f2;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+<div id="app" v-cloak>
+    <!-- 卡密验证层 -->
+    <div v-if="!isAuthenticated" class="auth-overlay px-6">
+        <div class="max-w-sm w-full text-center">
+            <h1 class="text-2xl serif mb-8 tracking-widest text-gray-800">请输入测评激活码</h1>
+            <input 
+                v-model="inputCode" 
+                type="text" 
+                placeholder="请输入购买后的8位激活码"
+                class="w-full bg-transparent border-b border-black py-3 text-center outline-none mb-6 tracking-[0.2em] text-gray-700"
+                @keyup.enter="verifyCode"
+            >
+            <button 
+                @click="verifyCode"
+                class="w-full py-4 bg-black text-white text-xs tracking-[0.3em] hover:bg-gray-800 transition-colors"
+            >
+                验证并开始测试
+            </button>
+            <p class="mt-8 text-[10px] text-gray-400 leading-loose">
+                激活码可在购买后的订单详情或自动发货私信中获取。<br>
+                每个激活码仅限一次有效测评。
+            </p>
+        </div>
+    </div>
+
+    <!-- 主体测试内容 -->
+    <div v-if="isAuthenticated" class="max-w-xl mx-auto px-6 py-20">
+        <!-- Header -->
+        <header v-if="!isFinished" class="mb-16 border-l-2 border-black pl-6">
+            <h1 class="text-2xl font-light tracking-widest serif">Mach-IV</h1>
+            <h2 class="text-sm text-gray-400 mt-1 uppercase tracking-widest">Psychological Assessment</h2>
+        </header>
+
+        <!-- Quiz Area -->
+        <main>
+            <transition name="fade" mode="out-in">
+                <!-- Question Step -->
+                <div v-if="!isFinished" :key="currentIndex">
+                    <div class="progress-line mb-12">
+                        <div class="progress-fill" :style="{ width: `${(currentIndex / questions.length) * 100}%` }"></div>
+                    </div>
+
+                    <div class="mb-12">
+                        <p class="text-xs text-gray-400 mb-4 tracking-tighter">— QUESTION {{ currentIndex + 1 }} / 20</p>
+                        <h3 class="text-xl md:text-2xl leading-relaxed serif font-medium text-gray-800">
+                            {{ questions[currentIndex].text }}
+                        </h3>
+                    </div>
+
+                    <div class="space-y-1">
+                        <button 
+                            v-for="option in options" 
+                            :key="option.value"
+                            @click="handleAnswer(option.value)"
+                            class="option-btn w-full py-5 text-left flex justify-between items-center group"
+                        >
+                            <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">{{ option.label }}</span>
+                            <span class="opacity-0 group-hover:opacity-100 transition-opacity text-xs"></span>
+                        </button>
+                    </div>
+
+                    <div class="mt-16 flex justify-between items-center text-xs tracking-widest text-gray-300">
+                        <button @click="prevQuestion" v-if="currentIndex > 0" class="hover:text-black transition-colors">BACK</button>
+                        <span v-else>START</span>
+                        <span>SCALED SCORE: {{ currentScore }}</span>
+                    </div>
+                </div>
+
+                <!-- Report Step -->
+                <div v-else key="result" class="bg-white p-8 md:p-12 shadow-sm border border-gray-100">
+                    <div class="text-center mb-12">
+                        <span class="text-xs tracking-[0.3em] text-gray-400 border-b border-gray-200 pb-2">测评报告书</span>
+                        <h2 class="text-3xl serif mt-8 font-bold text-gray-900">马基雅维利倾向分析</h2>
+                        <p class="text-sm text-gray-400 mt-2 italic">Assessment ID: {{ assessmentId }}</p>
+                    </div>
+
+                    <!-- Visual Data -->
+                    <div class="flex flex-col md:flex-row items-center justify-around mb-16 gap-8">
+                        <div class="text-center">
+                            <div class="text-xs text-gray-400 mb-2 tracking-widest uppercase">Total Score</div>
+                            <div class="text-6xl serif font-light text-gray-900">{{ finalScore }}</div>
+                            <div class="text-[10px] text-gray-300 mt-1">Range: 40 - 120</div>
+                        </div>
+                        <div class="w-48 h-48 relative">
+                            <canvas id="radarChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Depth Content -->
+                    <div class="space-y-10 text-left border-t border-gray-100 pt-10">
+                        <section>
+                            <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-4 uppercase">/ 核心性格摘要</h4>
+                            <p class="text-lg serif leading-relaxed text-gray-800 mb-2">{{ resultInterpretation.title }}</p>
+                            <p class="text-sm leading-relaxed text-gray-500">{{ resultInterpretation.desc }}</p>
+                        </section>
+
+                        <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 优势倾向</h4>
+                                <ul class="text-xs text-gray-600 space-y-2">
+                                    <li v-for="tag in resultInterpretation.pros" class="flex items-center">
+                                        <span class="w-1 h-1 bg-black mr-2"></span> {{ tag }}
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 潜在盲点</h4>
+                                <ul class="text-xs text-gray-600 space-y-2">
+                                    <li v-for="tag in resultInterpretation.cons" class="flex items-center">
+                                        <span class="w-1 h-1 bg-gray-300 mr-2"></span> {{ tag }}
+                                    </li>
+                                </ul>
+                            </div>
+                        </section>
+
+                        <section class="bg-gray-50 p-6 rounded-sm">
+                            <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 深度解析录</h4>
+                            <p class="text-xs leading-loose text-gray-500 italic">
+                                “{{ resultInterpretation.insight }}”
+                            </p>
+                        </section>
+                    </div>
+
+                    <div class="mt-16 pt-8 border-t border-gray-100 text-center">
+                        <div class="text-[10px] text-gray-300 uppercase italic">Authenticated by Mach-IV Standard System</div>
+                    </div>
+                </div>
+            </transition>
+        </main>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed, nextTick } = Vue;
+
+    createApp({
+        setup() {
+            // 权限相关
+            const isAuthenticated = ref(false);
+            const inputCode = ref('');
+            // 预设激活码（商业化时可定期更换或连接后端）
+            const validCodes = ['MACH2024', 'POWER888', 'SECRET99'];
+
+            const currentIndex = ref(0);
+            const answers = ref([]);
+            const isFinished = ref(false);
+            const assessmentId = ref(Math.random().toString(36).substr(2, 9).toUpperCase());
+            let chartInstance = null;
+
+            // 选项已修改为纯中文
+            const options = [
+                { label: '强烈反对', value: 1 },
+                { label: '不同意', value: 2 },
+                { label: '中立', value: 3 },
+                { label: '同意', value: 4 },
+                { label: '非常同意', value: 5 }
+            ];
+
+            const questions = [
+                { text: "不告诉别人你为什么要这么做的真正原因，是最明智的。", type: 'strategy', isReverse: false },
+                { text: "对待他人最好的方式是告诉他们，他们想听的话。", type: 'strategy', isReverse: false },
+                { text: "只有在确保道德的情况下才采取行动，那是勇气的表现。", type: 'morality', isReverse: true },
+                { text: "大多数人本质上都是善良和慷慨的。", type: 'view', isReverse: true },
+                { text: "最能体现一个人价值的，是其在世俗生活中的成就。", type: 'view', isReverse: false },
+                { text: "最好假设所有的人都有邪恶的一面，一旦有机会就会表现出来。", type: 'view', isReverse: false },
+                { text: "只有在能给自己带来好处时，才应当诚实。", type: 'morality', isReverse: false },
+                { text: "一般来说，除非被迫，否则人们不会努力工作。", type: 'view', isReverse: false },
+                { text: "总的来说，卑微而诚实要比显赫而欺诈好得多。", type: 'morality', isReverse: true },
+                { text: "向一个面临困境的人解释其行为的真正动机，比安慰他更有帮助。", type: 'strategy', isReverse: false },
+                { text: "为了达到目的，采取一些不正当手段通常是可以理解的。", type: 'morality', isReverse: false },
+                { text: "成功人士大多过着清白而道德的生活。", type: 'morality', isReverse: true },
+                { text: "任何完全信任别人的人都在自找麻烦。", type: 'view', isReverse: false },
+                { text: "如果大部分人都能在不被发现的情况下撒谎，他们一定会这么做。", type: 'view', isReverse: false },
+                { text: "如果不走捷径，就很难在社会中出人头地。", type: 'strategy', isReverse: false },
+                { text: "大多数人是不值得信任的。", type: 'view', isReverse: false },
+                { text: "在任何时候都要完全诚实，这几乎是不可能的。", type: 'morality', isReverse: false },
+                { text: "一个人如果在工作中经常表现出不诚实，那他一定很难在事业上取得长远成功。", type: 'morality', isReverse: true },
+                { text: "当你请求某人为你办事时，最好给出真正的理由，而不是编造更动听的借口。", type: 'strategy', isReverse: true },
+                { text: "大多数人在失去父母时比失去财产时感到更痛苦。", type: 'view', isReverse: false }
+            ];
+
+            const verifyCode = () => {
+                if (validCodes.includes(inputCode.value.trim().toUpperCase())) {
+                    isAuthenticated.value = true;
+                } else {
+                    alert('无效的激活码，请重新确认。');
+                }
+            };
+
+            const handleAnswer = (val) => {
+                answers.value[currentIndex.value] = val;
+                if (currentIndex.value < questions.length - 1) {
+                    currentIndex.value++;
+                } else {
+                    isFinished.value = true;
+                    setTimeout(() => renderChart(), 500);
+                }
+            };
+
+            const prevQuestion = () => currentIndex.value > 0 && currentIndex.value--;
+
+            const currentScore = computed(() => {
+                return answers.value.reduce((acc, val, i) => {
+                    const q = questions[i];
+                    return acc + (q.isReverse ? (6 - val) : val);
+                }, 0) + 20;
+            });
+
+            const finalScore = computed(() => currentScore.value);
+
+            const resultInterpretation = computed(() => {
+                const s = finalScore.value;
+                if (s >= 95) return { title: "绝对理性的操盘手", desc: "你拥有极高的马基雅维利倾向。你视生活为一盘复杂的棋局，情绪很少能干扰你的决策。你极度务实，专注于结果而非过程中的温情。", pros: ["极强的战略眼光", "高压下的极端冷静", "出色的利益最大化能力"], cons: ["难以建立深层情感链接", "易被他人贴上冷酷标签", "过度防御心态"], insight: "在阴影中行走固然安全，但有时光亮处的坦诚反而能换取更高效的合作成本。" };
+                if (s >= 75) return { title: "现实主义的博弈者", desc: "你是一位清醒的现实主义者。你懂得规则的局限性，并能熟练地在社会惯例与个人目标间游走。你并不恶意伤害他人，但绝不让自己处于被动。", pros: ["灵活的社交适应力", "敏锐的风险感知", "良好的自我界限感"], cons: ["偶尔的功利主义倾向", "对他人动机的防御性假设"], insight: "看透而不说透是一种智慧，但不要因为看透了阴暗面就忘记了阳光的存在。" };
+                if (s >= 55) return { title: "中正平衡的观察者", desc: "你的得分接近常模中位数。你既保留了对他人的基本信任，也具备必要的社会戒心。你是社会结构中最稳定的基石，能够在保持道德的同时追求个人利益。", pros: ["可靠的社交信誉", "健康的心理适应性", "共情与理性的平衡"], cons: ["在极端竞争环境下可能犹豫不决", "易受环境氛围影响决策"], insight: "保持中庸之道是极大的艺术。你不需要改变什么，只需在不同场景下微调你的策略。" };
+                return { title: "诚挚的理想主义者", desc: "你拥有极低的马基雅维利倾向。你天然地倾向于相信他人，重视情感的纯粹性远胜过物质利益。你是这个时代稀缺的温暖来源。", pros: ["极高的人格魅力与信任度", "深厚的情感共鸣力", "纯粹的道德坚持"], cons: ["容易在复杂职场中受伤", "对博弈行为的过度排斥"], insight: "善良是一种选择，但你需要为这种善良披上一层盔甲。理解操纵的逻辑是为了更好地抵御它。" };
+            });
+
+            const renderChart = () => {
+                const canvas = document.getElementById('radarChart');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                if (chartInstance) chartInstance.destroy();
+                
+                const dimensionScores = { strategy: 0, morality: 0, view: 0 };
+                const counts = { strategy: 0, morality: 0, view: 0 };
+                answers.value.forEach((val, i) => {
+                    const q = questions[i];
+                    dimensionScores[q.type] += q.isReverse ? (6 - val) : val;
+                    counts[q.type]++;
+                });
+
+                chartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['社交策略', '道德弹性', '人性认知'],
+                        datasets: [{
+                            data: [
+                                (dimensionScores.strategy / (counts.strategy * 5)) * 100,
+                                (dimensionScores.morality / (counts.morality * 5)) * 100,
+                                (dimensionScores.view / (counts.view * 5)) * 100
+                            ],
+                            backgroundColor: 'rgba(51, 51, 51, 0.05)',
+                            borderColor: '#333',
+                            borderWidth: 1,
+                            pointRadius: 2,
+                            pointBackgroundColor: '#333'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: { min: 0, max: 100, ticks: { display: false }, grid: { color: '#f0f0f0' }, angleLines: { color: '#f0f0f0' }, pointLabels: { font: { size: 10, family: 'Noto Sans SC' } } }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            };
+
+            return { isAuthenticated, inputCode, verifyCode, currentIndex, questions, options, handleAnswer, prevQuestion, isFinished, finalScore, currentScore, resultInterpretation, assessmentId };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
