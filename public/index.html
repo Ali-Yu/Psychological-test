@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Psychological Tests</title>
+<title>Welcome</title>
 
-<!-- Pixel Font -->
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 
 <style>
@@ -19,57 +18,36 @@ body {
     align-items: center;
     height: 100vh;
     text-align: center;
+    overflow: hidden;
 }
 
 .container {
-    max-width: 600px;
+    animation: flicker 2s infinite;
 }
 
 h1 {
-    font-size: 18px;
-    margin-bottom: 40px;
+    font-size: 22px;
+    letter-spacing: 2px;
 }
 
-.button {
-    display: block;
-    margin: 20px 0;
-    padding: 15px;
-    border: 3px solid #fff;
-    text-decoration: none;
-    color: #fff;
-    transition: 0.2s;
+.sub {
+    margin-top: 40px;
+    font-size: 10px;
+    opacity: 0.7;
 }
 
-.button:hover {
-    background: #fff;
-    color: #000;
-}
-
-.footer {
-    margin-top: 50px;
-    font-size: 8px;
-    opacity: 0.6;
+@keyframes flicker {
+    0% { opacity: 1; }
+    50% { opacity: 0.85; }
+    100% { opacity: 1; }
 }
 </style>
 </head>
 
 <body>
 <div class="container">
-
-    <h1>PSYCHOLOGICAL<br>TESTS</h1>
-
-    <a class="button" href="/machiavellianism">
-        Machiavellianism Test
-    </a>
-
-    <a class="button" href="/mbti">
-        MBTI Personality Test
-    </a>
-
-    <div class="footer">
-        © 2026 Mind Lab
-    </div>
-
+    <h1>WELCOME</h1>
+    <div class="sub">PSYCHOLOGICAL TESTS</div>
 </div>
 </body>
 </html>
