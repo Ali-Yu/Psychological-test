@@ -10,4 +10,11 @@
 
 逻辑解析：
 
+
 定义钥匙库： 在 setup() 函数中，有一个 validCodes 数组（例如 ['MACH2024', 'POWER888', 'SECRET99']）。这些就是允许通过的“钥匙”。
+
+
+# 3. 临时地址
+https://psychological-test-sooty.vercel.app/ 
+https://psychological-test-sooty.vercel.app/machiavellianism 
+https://psychological-test-sooty.vercel.app/mbti
