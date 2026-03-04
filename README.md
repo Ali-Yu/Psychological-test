@@ -16,6 +16,6 @@
 
 # 3. 临时地址
 [https://psychological-test-sooty.vercel.app/ ](https://psychological-test-alis-projects-1493a1cf.vercel.app/)
-https://psychological-test-sooty.vercel.app/machiavellianism 
-https://psychological-test-sooty.vercel.app/mbti
+[https://psychological-test-sooty.vercel.app/](https://psychological-test-alis-projects-1493a1cf.vercel.app/)machiavellianism 
+[https://psychological-test-sooty.vercel.app/](https://psychological-test-alis-projects-1493a1cf.vercel.app/)mbti
 
