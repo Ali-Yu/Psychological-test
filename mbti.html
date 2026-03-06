@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MBTI 性格测评系统</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: #f7f6f2;
+            color: #333;
+        }
+        .serif { font-family: 'Noto Serif SC', serif; }
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .fade-enter-from { opacity: 0; transform: translateY(10px); }
+        .fade-leave-to   { opacity: 0; transform: translateY(-10px); }
+        .option-btn {
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .option-btn:hover {
+            background: #fff;
+            padding-left: 1.5rem;
+            border-color: #333;
+        }
+        .progress-line { height: 1px; background: #e5e5e5; }
+        .progress-fill { height: 1px; background: #333; transition: 0.6s; }
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body class="antialiased">
+
+<!-- Token 验证：校验由 Netlify Function 签发的 token -->
+<script>
+(function () {
+    const p     = new URLSearchParams(location.search);
+    const token = p.get('token') || '';
+    // token 格式：YYYYMMDD.签名16位，只在前端验证日期部分防直接访问
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const parts = token.split('.');
+    if (parts.length !== 2 || parts[0] !== today) {
+        location.replace('index.html');
+    }
+})();
+</script>
+
+<div id="app" v-cloak class="max-w-xl mx-auto px-6 py-20">
+
+    <header v-if="!finished" class="mb-16 border-l-2 border-black pl-6">
+        <h1 class="text-2xl serif tracking-widest">MBTI 30</h1>
+        <h2 class="text-sm text-gray-400 uppercase tracking-widest mt-1">Personality Assessment</h2>
+    </header>
+
+    <transition name="fade" mode="out-in">
+
+        <!-- 题目 -->
+        <div v-if="!finished" :key="index">
+
+            <div class="progress-line mb-12">
+                <div class="progress-fill" :style="{ width: (index / questions.length * 100) + '%' }"></div>
+            </div>
+
+            <p class="text-xs text-gray-400 mb-4 tracking-tighter">
+                — QUESTION {{ index + 1 }} / 30
+            </p>
+
+            <h3 class="text-xl md:text-2xl serif leading-relaxed mb-12">
+                {{ questions[index].text }}
+            </h3>
+
+            <div class="space-y-1">
+                <button
+                    v-for="opt in options"
+                    :key="opt.value"
+                    @click="answer(opt.value)"
+                    class="option-btn w-full py-5 text-left text-sm text-gray-500 hover:text-black"
+                >
+                    {{ opt.label }}
+                </button>
+            </div>
+
+            <div class="mt-16 text-xs text-gray-300 tracking-widest">
+                SCALED SCORE: {{ totalAnswered }} / 30
+            </div>
+
+        </div>
+
+        <!-- 结果 -->
+        <div v-else key="result" class="bg-white p-10 shadow-sm border border-gray-100">
+
+            <div class="text-center mb-12">
+                <span class="text-xs tracking-[0.3em] text-gray-400 border-b pb-2">MBTI REPORT</span>
+                <h2 class="text-4xl serif mt-8 font-bold">{{ resultType }}</h2>
+                <p class="text-sm text-gray-400 mt-2">人格倾向分析报告</p>
+            </div>
+
+            <div class="flex flex-col md:flex-row items-center justify-around mb-16 gap-10">
+                <div class="text-center">
+                    <div class="text-xs text-gray-400 uppercase mb-3">Dimension Score</div>
+                    <div class="space-y-2 text-sm text-gray-600">
+                        <div class="flex items-center gap-3">
+                            <span class="w-16 text-right text-xs text-gray-400">E / I</span>
+                            <div class="w-32 h-1 bg-gray-100 rounded">
+                                <div class="h-1 bg-gray-700 rounded transition-all" :style="{ width: percent.E + '%' }"></div>
+                            </div>
+                            <span class="text-xs text-gray-400">{{ percent.E }}%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="w-16 text-right text-xs text-gray-400">S / N</span>
+                            <div class="w-32 h-1 bg-gray-100 rounded">
+                                <div class="h-1 bg-gray-700 rounded transition-all" :style="{ width: percent.S + '%' }"></div>
+                            </div>
+                            <span class="text-xs text-gray-400">{{ percent.S }}%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="w-16 text-right text-xs text-gray-400">T / F</span>
+                            <div class="w-32 h-1 bg-gray-100 rounded">
+                                <div class="h-1 bg-gray-700 rounded transition-all" :style="{ width: percent.T + '%' }"></div>
+                            </div>
+                            <span class="text-xs text-gray-400">{{ percent.T }}%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="w-16 text-right text-xs text-gray-400">J / P</span>
+                            <div class="w-32 h-1 bg-gray-100 rounded">
+                                <div class="h-1 bg-gray-700 rounded transition-all" :style="{ width: percent.J + '%' }"></div>
+                            </div>
+                            <span class="text-xs text-gray-400">{{ percent.J }}%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="w-56 h-56">
+                    <canvas id="radar"></canvas>
+                </div>
+            </div>
+
+            <div class="space-y-10 text-left border-t pt-10">
+
+                <section>
+                    <h4 class="text-xs tracking-widest text-gray-400 mb-4 uppercase">/ 性格概述</h4>
+                    <p class="text-lg serif mb-3">{{ report.title }}</p>
+                    <p class="text-sm text-gray-500 leading-relaxed">{{ report.desc }}</p>
+                </section>
+
+                <section class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h4 class="text-xs tracking-widest text-gray-400 mb-3 uppercase">/ 优势特质</h4>
+                        <ul class="text-xs space-y-2 text-gray-600">
+                            <li v-for="p in report.pros" class="flex items-start">
+                                <span class="w-1 h-1 bg-black mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ p }}
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-xs tracking-widest text-gray-400 mb-3 uppercase">/ 潜在盲点</h4>
+                        <ul class="text-xs space-y-2 text-gray-600">
+                            <li v-for="c in report.cons" class="flex items-start">
+                                <span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ c }}
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section class="bg-gray-50 p-6">
+                    <h4 class="text-xs tracking-widest text-gray-400 mb-3 uppercase">/ 职业建议</h4>
+                    <p class="text-xs text-gray-600 leading-relaxed">{{ report.career }}</p>
+                </section>
+
+                <section>
+                    <h4 class="text-xs tracking-widest text-gray-400 mb-3 uppercase">/ 成长建议</h4>
+                    <p class="text-xs text-gray-500 italic leading-loose">"{{ report.growth }}"</p>
+                </section>
+
+            </div>
+
+            <div class="mt-16 pt-8 border-t border-gray-100 text-center">
+                <div class="text-[10px] text-gray-300 uppercase italic">Authenticated by MBTI Standard System</div>
+                <a href="index.html" class="mt-4 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
+                    ← Return to Center
+                </a>
+            </div>
+
+        </div>
+
+    </transition>
+</div>
+
+<script>
+const { createApp, ref, computed, nextTick } = Vue;
+
+createApp({
+    setup() {
+        const index    = ref(0);
+        const finished = ref(false);
+        const answers  = ref([]);
+
+        const options = [
+            { label: '非常不同意', value: 1 },
+            { label: '不同意',     value: 2 },
+            { label: '中立',       value: 3 },
+            { label: '同意',       value: 4 },
+            { label: '非常同意',   value: 5 }
+        ];
+
+        const questions = [
+            { text: "我更喜欢独处而不是参加大型社交活动。",           dim: "EI", reverse: false },
+            { text: "与人交谈会让我精力充沛。",                       dim: "EI", reverse: true  },
+            { text: "我习惯先行动再思考。",                           dim: "EI", reverse: true  },
+            { text: "我需要大量独处时间恢复能量。",                   dim: "EI", reverse: false },
+            { text: "我乐于成为讨论中的焦点。",                       dim: "EI", reverse: true  },
+            { text: "我更信任现实经验而不是直觉。",                   dim: "SN", reverse: false },
+            { text: "我经常思考未来可能发生的事情。",                 dim: "SN", reverse: true  },
+            { text: "细节比整体概念更重要。",                         dim: "SN", reverse: false },
+            { text: "我喜欢探索抽象理论。",                           dim: "SN", reverse: true  },
+            { text: "我倾向于关注当下而不是远景。",                   dim: "SN", reverse: false },
+            { text: "做决定时我更看重逻辑。",                         dim: "TF", reverse: false },
+            { text: "我常因他人情绪而改变决定。",                     dim: "TF", reverse: true  },
+            { text: "公平比同情更重要。",                             dim: "TF", reverse: false },
+            { text: "我讨厌冲突。",                                   dim: "TF", reverse: true  },
+            { text: "我会优先考虑事实。",                             dim: "TF", reverse: false },
+            { text: "我喜欢提前规划。",                               dim: "JP", reverse: false },
+            { text: "临时变化让我兴奋。",                             dim: "JP", reverse: true  },
+            { text: "我倾向制定明确计划。",                           dim: "JP", reverse: false },
+            { text: "我经常拖延到最后一刻。",                         dim: "JP", reverse: true  },
+            { text: "我喜欢有条理的生活。",                           dim: "JP", reverse: false },
+            { text: "我在人群中感到自在。",                           dim: "EI", reverse: true  },
+            { text: "我依赖直觉做决定。",                             dim: "SN", reverse: true  },
+            { text: "我重视情感表达。",                               dim: "TF", reverse: true  },
+            { text: "我喜欢保持选择开放。",                           dim: "JP", reverse: true  },
+            { text: "我更喜欢安静的环境。",                           dim: "EI", reverse: false },
+            { text: "我喜欢构建未来蓝图。",                           dim: "SN", reverse: true  },
+            { text: "我做决定时更理性。",                             dim: "TF", reverse: false },
+            { text: "我习惯按计划行事。",                             dim: "JP", reverse: false },
+            { text: "我倾向避免成为焦点。",                           dim: "EI", reverse: false },
+            { text: "我更关注现实细节。",                             dim: "SN", reverse: false }
+        ];
+
+        function answer(val) {
+            answers.value[index.value] = val;
+            if (index.value < questions.length - 1) {
+                index.value++;
+            } else {
+                finished.value = true;
+                nextTick(() => renderChart());
+            }
+        }
+
+        const totalAnswered = computed(() => answers.value.length);
+
+        function calc() {
+            let score = { E: 0, I: 0, S: 0, N: 0, T: 0, F: 0, J: 0, P: 0 };
+            questions.forEach((q, i) => {
+                let val = answers.value[i];
+                if (q.reverse) val = 6 - val;
+                if (q.dim === "EI") { val > 3 ? score.E += val : score.I += val; }
+                if (q.dim === "SN") { val > 3 ? score.N += val : score.S += val; }
+                if (q.dim === "TF") { val > 3 ? score.F += val : score.T += val; }
+                if (q.dim === "JP") { val > 3 ? score.P += val : score.J += val; }
+            });
+            return score;
+        }
+
+        const percent = computed(() => {
+            const s = calc();
+            return {
+                E: Math.round(s.E / (s.E + s.I) * 100) || 50,
+                S: Math.round(s.S / (s.S + s.N) * 100) || 50,
+                T: Math.round(s.T / (s.T + s.F) * 100) || 50,
+                J: Math.round(s.J / (s.J + s.P) * 100) || 50
+            };
+        });
+
+        const resultType = computed(() => {
+            const p = percent.value;
+            return (p.E > 50 ? 'E' : 'I') +
+                   (p.S > 50 ? 'S' : 'N') +
+                   (p.T > 50 ? 'T' : 'F') +
+                   (p.J > 50 ? 'J' : 'P');
+        });
+
+        // 16 种类型的完整报告内容
+        const typeReports = {
+            INTJ: { title:"策略家 — INTJ", desc:"你是天生的战略家，拥有独立思考与长远规划的能力。思维缜密，对低效与平庸有天然抵触，通常在复杂系统中表现卓越。", pros:["极强的独立判断力","长远战略思维","高度自律与执行力"], cons:["过于苛求完美","情感表达生硬","对他人意见可能过度轻视"], career:"适合：系统架构师、战略顾问、研究员、投资分析师。", growth:"尝试接纳不完美的过程。偶尔放下计划，允许自己感受当下。" },
+            INTP: { title:"思想家 — INTP", desc:"你对世界充满好奇，擅长解构复杂理论。你更享受思考本身，而非结论。内向且分析性极强，是逻辑与创新的结合体。", pros:["深刻的分析与推理能力","极强的概念理解力","开放的思想体系"], cons:["拖延与执行力不足","社交兴趣低","理论与实践脱节"], career:"适合：哲学研究、软件工程、数学、独立创作。", growth:"将想法落地是最大挑战。找到一个能推动你执行的合作伙伴。" },
+            ENTJ: { title:"指挥官 — ENTJ", desc:"你生来就是领导者。目标明确，决策果断，善于动员他人实现宏大愿景。对效率的追求近乎本能，是组织和变革的核心驱动力。", pros:["强大的领导力与决断力","战略视野广阔","高效的目标达成能力"], cons:["控制欲偏强","忽视情感因素","对他人要求过高"], career:"适合：CEO、管理顾问、律师、政治家。", growth:"学会倾听，不是所有问题都需要你来解决。" },
+            ENTP: { title:"辩论家 — ENTP", desc:"你充满智识活力，喜欢挑战既有观念。辩论对你来说既是娱乐也是工具。你能快速发现机会，但常常在执行阶段失去兴趣。", pros:["敏锐的创新嗅觉","无与伦比的辩证思维","快速构建全局模型"], cons:["缺乏执行耐心","可能显得好争论","项目容易烂尾"], career:"适合：创业者、律师、编剧、产品经理。", growth:"学会把最好的创意坚持到底，而不是永远追逐下一个闪光点。" },
+            INFJ: { title:"倡导者 — INFJ", desc:"你是最稀有的人格类型之一。你拥有强烈的理想主义和深刻的洞察力，能感受到他人难以察觉的模式。你的使命感驱动你不断追求更深层的意义。", pros:["深刻的共情与洞察力","强烈的使命感","稳定的价值观体系"], cons:["过度理想化","容易精力耗竭","偶尔自我封闭"], career:"适合：心理咨询师、作家、社会工作者、非营利领域。", growth:"照顾好自己，才能更好地帮助他人。设立边界是力量的表现。" },
+            INFP: { title:"调停者 — INFP", desc:"你是内心世界极为丰富的理想主义者。你渴望真实与意义，对自己和他人有深刻的情感感知。创造力是你最自然的表达方式。", pros:["丰富的创造力与想象力","真实的情感深度","强烈的价值导向"], cons:["过度自我批判","实际行动力偏弱","难以应对冷酷现实"], career:"适合：作家、艺术家、心理治疗师、教育工作者。", growth:"允许自己不完美。把内心的故事写出来，它比你想象的更有价值。" },
+            ENFJ: { title:"主人公 — ENFJ", desc:"你天生具有感召力，能让他人感到被理解和激励。你敏感于群体动态，是天然的调和者与领导者，常常把他人的成长放在首位。", pros:["极强的人际影响力","敏锐的情感感知","激励他人的天赋"], cons:["过度牺牲自我","对批评过于敏感","难以拒绝他人"], career:"适合：教师、职业教练、公关、心理咨询。", growth:"你不能把所有人都带到你想去的地方。学会放手是成长的一部分。" },
+            ENFP: { title:"竞选者 — ENFP", desc:"你热情洋溢，充满创意，总能在人群中点燃活力。你对可能性的嗅觉极为敏锐，但同样需要深层的意义与真实的连接。", pros:["无限的热情与感染力","多维度的创造思维","快速建立人际连接"], cons:["容易分心","情绪波动较大","深度执行力有限"], career:"适合：创意总监、社群运营、演员、品牌策划。", growth:"把你的热情聚焦在一件事上，坚持六个月，你会发现真正属于你的能量。" },
+            ISTJ: { title:"物流师 — ISTJ", desc:"你是可靠性的象征。你重视传统、规则和责任，做事务实而精确。你可能不是最显眼的那个人，但永远是团队中最值得依赖的支柱。", pros:["极高的可靠性与责任感","精确的执行力","稳定的情绪基线"], cons:["抵制变化与创新","可能过于刻板","情感表达内敛"], career:"适合：会计师、项目经理、军事/公务员、质检工程师。", growth:"规则是工具，而非目的。偶尔质疑既定流程，可能让你发现更好的路径。" },
+            ISFJ: { title:"守护者 — ISFJ", desc:"你是温暖而无私的守护者，极度关注他人的需求与感受。你记忆力惊人，对细节和关系投入大量心力，是家庭与团队的情感黏合剂。", pros:["深厚的关怀与耐心","极强的责任感","细腻的观察与记忆力"], cons:["自我牺牲过度","难以拒绝他人","压抑个人需求"], career:"适合：护士、教师、行政助理、社区服务者。", growth:"你的需求同样重要。学会说'不'，不是自私，而是自我保护。" },
+            ESTJ: { title:"总经理 — ESTJ", desc:"你是天生的管理者，重视秩序、效率和规则。你能快速建立结构，让事情有序推进。你的原则性和执行力是组织的宝贵资产。", pros:["强大的组织和执行力","清晰的判断与决策","高度的责任心"], cons:["灵活性不足","可能显得强势","忽视情感层面"], career:"适合：运营总监、法官、银行经理、工程项目负责人。", growth:"并非所有问题都有标准答案。培养对模糊性的容忍度，会让你的领导力更完整。" },
+            ESFJ: { title:"执政官 — ESFJ", desc:"你是关怀与和谐的守护者。你极度在意他人的感受，擅长营造温暖的社交环境。你的价值感常常来源于他人的认可与感激。", pros:["极强的社交能力","温暖的关怀与同理心","强烈的集体责任感"], cons:["过度在意他人评价","回避冲突","可能压抑真实想法"], career:"适合：活动策划、人力资源、销售、教育工作者。", growth:"你不需要所有人都喜欢你。真正的关系能够承受诚实与摩擦。" },
+            ISTP: { title:"鉴赏家 — ISTP", desc:"你是冷静的问题解决者，擅长在混乱中找到逻辑。你更喜欢用行动而非语言表达自己。对机械、系统和工具有天然的亲近感。", pros:["极强的实际解决问题能力","冷静的危机处理","高度灵活性"], cons:["情感距离感强","长期承诺困难","不擅长情绪表达"], career:"适合：工程师、飞行员、外科医生、程序员。", growth:"让身边的人了解你内心真实的想法。沉默有时会被误解为冷漠。" },
+            ISFP: { title:"探险家 — ISFP", desc:"你是安静而富有感性的艺术家，用生活本身来表达内心的美学。你重视自由与真实，对强迫和框架有天然的抵触。", pros:["敏锐的美学感知","真实的情感表达","高度的适应灵活性"], cons:["长期规划困难","自我批判倾向","回避冲突"], career:"适合：设计师、摄影师、厨师、音乐人。", growth:"你的创造力需要一个输出的舞台。不要让内心的作品只停留在想象里。" },
+            ESTP: { title:"企业家 — ESTP", desc:"你活在当下，行动力极强，善于在真实环境中快速应对。你有天然的魅力和说服力，在需要即时反应的场合如鱼得水。", pros:["无与伦比的即兴应变力","强大的执行与行动力","天然的社交魅力"], cons:["长期规划意识弱","冲动决策倾向","对规则有抵触"], career:"适合：销售、创业者、运动员、急救人员。", growth:"放慢速度，思考长远。今天的冲动可能会成为明天的代价。" },
+            ESFP: { title:"表演者 — ESFP", desc:"你是生活的庆典，永远能让房间充满活力。你热爱当下，享受人际连接，用热情感染周围所有人。你的存在本身就是一种礼物。", pros:["感染力极强的热情","极高的社交适应力","活在当下的生命力"], cons:["长期专注力有限","回避负面情绪","决策可能欠缺深思"], career:"适合：演员、活动主持、旅游业、客户服务。", growth:"快乐不需要每时每刻都被填满。静下来，你会发现内心也有深度的宝藏。" }
+        };
+
+        const report = computed(() => {
+            return typeReports[resultType.value] || {
+                title: "你的核心人格类型为 " + resultType.value,
+                desc: "你在四个维度上呈现出独特组合，这决定了你的认知方式、决策逻辑与生活节奏。",
+                pros: ["自我认知清晰", "决策风格稳定", "行为模式一致"],
+                cons: ["在极端压力下可能失衡", "过度依赖偏好模式"],
+                career: "适合根据你的主导功能选择结构匹配的职业环境。",
+                growth: "理解对立维度，发展非优势功能，将使你更加完整。"
+            };
+        });
+
+        let chart = null;
+        function renderChart() {
+            const ctx = document.getElementById('radar');
+            if (!ctx) return;
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['E', 'S', 'T', 'J'],
+                    datasets: [{
+                        data: [
+                            percent.value.E,
+                            percent.value.S,
+                            percent.value.T,
+                            percent.value.J
+                        ],
+                        backgroundColor: 'rgba(0,0,0,0.05)',
+                        borderColor: '#333',
+                        borderWidth: 1,
+                        pointRadius: 2,
+                        pointBackgroundColor: '#333'
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        r: {
+                            min: 0, max: 100,
+                            ticks: { display: false },
+                            grid: { color: '#f0f0f0' },
+                            angleLines: { color: '#f0f0f0' },
+                            pointLabels: { font: { size: 11, family: 'Noto Sans SC' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        return { questions, index, options, answer, finished, totalAnswered, percent, resultType, report };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
