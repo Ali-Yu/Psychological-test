@@ -9,27 +9,16 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
-
-        body {
-            font-family: 'Noto Sans SC', sans-serif;
-            background: #f7f6f2;
-            color: #333;
-        }
+        body { font-family: 'Noto Sans SC', sans-serif; background: #f7f6f2; color: #333; }
         .serif { font-family: 'Noto Serif SC', serif; }
-        .fade-enter-active, .fade-leave-active {
-            transition: opacity 0.4s ease, transform 0.4s ease;
-        }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.4s ease, transform 0.4s ease; }
         .fade-enter-from { opacity: 0; transform: translateY(10px); }
         .fade-leave-to   { opacity: 0; transform: translateY(-10px); }
         .option-btn {
             transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             border-bottom: 1px solid #e5e5e5;
         }
-        .option-btn:hover {
-            background: #fff;
-            padding-left: 1.5rem;
-            border-color: #333;
-        }
+        .option-btn:hover { background: #fff; padding-left: 1.5rem; border-color: #333; }
         .progress-line { height: 1px; background: #e5e5e5; }
         .progress-fill { height: 1px; background: #333; transition: 0.6s; }
         [v-cloak] { display: none; }
@@ -37,12 +26,12 @@
 </head>
 <body class="antialiased">
 
-<!-- Token 验证：校验由 Netlify Function 签发的 token -->
+<!-- Token 验证：校验由 Cloudflare Function 签发的 token -->
 <script>
 (function () {
     const p     = new URLSearchParams(location.search);
     const token = p.get('token') || '';
-    // token 格式：YYYYMMDD.签名16位，只在前端验证日期部分防直接访问
+    // token 格式：YYYYMMDD.签名16位，前端只验证日期部分防止直接访问
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const parts = token.split('.');
     if (parts.length !== 2 || parts[0] !== today) {
@@ -62,34 +51,21 @@
 
         <!-- 题目 -->
         <div v-if="!finished" :key="index">
-
             <div class="progress-line mb-12">
                 <div class="progress-fill" :style="{ width: (index / questions.length * 100) + '%' }"></div>
             </div>
-
-            <p class="text-xs text-gray-400 mb-4 tracking-tighter">
-                — QUESTION {{ index + 1 }} / 30
-            </p>
-
-            <h3 class="text-xl md:text-2xl serif leading-relaxed mb-12">
-                {{ questions[index].text }}
-            </h3>
-
+            <p class="text-xs text-gray-400 mb-4 tracking-tighter">— QUESTION {{ index + 1 }} / 30</p>
+            <h3 class="text-xl md:text-2xl serif leading-relaxed mb-12">{{ questions[index].text }}</h3>
             <div class="space-y-1">
                 <button
-                    v-for="opt in options"
-                    :key="opt.value"
+                    v-for="opt in options" :key="opt.value"
                     @click="answer(opt.value)"
                     class="option-btn w-full py-5 text-left text-sm text-gray-500 hover:text-black"
-                >
-                    {{ opt.label }}
-                </button>
+                >{{ opt.label }}</button>
             </div>
-
             <div class="mt-16 text-xs text-gray-300 tracking-widest">
                 SCALED SCORE: {{ totalAnswered }} / 30
             </div>
-
         </div>
 
         <!-- 结果 -->
@@ -108,46 +84,42 @@
                         <div class="flex items-center gap-3">
                             <span class="w-16 text-right text-xs text-gray-400">E / I</span>
                             <div class="w-32 h-1 bg-gray-100 rounded">
-                                <div class="h-1 bg-gray-700 rounded transition-all" :style="{ width: percent.E + '%' }"></div>
+                                <div class="h-1 bg-gray-700 rounded" :style="{ width: percent.E + '%' }"></div>
                             </div>
                             <span class="text-xs text-gray-400">{{ percent.E }}%</span>
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="w-16 text-right text-xs text-gray-400">S / N</span>
                             <div class="w-32 h-1 bg-gray-100 rounded">
-                                <div class="h-1 bg-gray-700 rounded transition-all" :style="{ width: percent.S + '%' }"></div>
+                                <div class="h-1 bg-gray-700 rounded" :style="{ width: percent.S + '%' }"></div>
                             </div>
                             <span class="text-xs text-gray-400">{{ percent.S }}%</span>
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="w-16 text-right text-xs text-gray-400">T / F</span>
                             <div class="w-32 h-1 bg-gray-100 rounded">
-                                <div class="h-1 bg-gray-700 rounded transition-all" :style="{ width: percent.T + '%' }"></div>
+                                <div class="h-1 bg-gray-700 rounded" :style="{ width: percent.T + '%' }"></div>
                             </div>
                             <span class="text-xs text-gray-400">{{ percent.T }}%</span>
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="w-16 text-right text-xs text-gray-400">J / P</span>
                             <div class="w-32 h-1 bg-gray-100 rounded">
-                                <div class="h-1 bg-gray-700 rounded transition-all" :style="{ width: percent.J + '%' }"></div>
+                                <div class="h-1 bg-gray-700 rounded" :style="{ width: percent.J + '%' }"></div>
                             </div>
                             <span class="text-xs text-gray-400">{{ percent.J }}%</span>
                         </div>
                     </div>
                 </div>
-                <div class="w-56 h-56">
-                    <canvas id="radar"></canvas>
-                </div>
+                <div class="w-56 h-56"><canvas id="radar"></canvas></div>
             </div>
 
             <div class="space-y-10 text-left border-t pt-10">
-
                 <section>
                     <h4 class="text-xs tracking-widest text-gray-400 mb-4 uppercase">/ 性格概述</h4>
                     <p class="text-lg serif mb-3">{{ report.title }}</p>
                     <p class="text-sm text-gray-500 leading-relaxed">{{ report.desc }}</p>
                 </section>
-
                 <section class="grid md:grid-cols-2 gap-8">
                     <div>
                         <h4 class="text-xs tracking-widest text-gray-400 mb-3 uppercase">/ 优势特质</h4>
@@ -166,28 +138,26 @@
                         </ul>
                     </div>
                 </section>
-
                 <section class="bg-gray-50 p-6">
                     <h4 class="text-xs tracking-widest text-gray-400 mb-3 uppercase">/ 职业建议</h4>
                     <p class="text-xs text-gray-600 leading-relaxed">{{ report.career }}</p>
                 </section>
-
                 <section>
                     <h4 class="text-xs tracking-widest text-gray-400 mb-3 uppercase">/ 成长建议</h4>
                     <p class="text-xs text-gray-500 italic leading-loose">"{{ report.growth }}"</p>
                 </section>
-
             </div>
 
             <div class="mt-16 pt-8 border-t border-gray-100 text-center">
                 <div class="text-[10px] text-gray-300 uppercase italic">Authenticated by MBTI Standard System</div>
-                <a href="index.html" class="mt-4 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
+                <p class="mt-6 text-xs text-gray-400 tracking-wide">📷 建议截图保存你的测评结果</p>
+                <p class="text-[10px] text-gray-300 mt-1">报告不会被储存，关闭页面后将无法找回</p>
+                <a href="index.html" class="mt-6 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
                     ← Return to Center
                 </a>
             </div>
 
         </div>
-
     </transition>
 </div>
 
@@ -284,7 +254,6 @@ createApp({
                    (p.J > 50 ? 'J' : 'P');
         });
 
-        // 16 种类型的完整报告内容
         const typeReports = {
             INTJ: { title:"策略家 — INTJ", desc:"你是天生的战略家，拥有独立思考与长远规划的能力。思维缜密，对低效与平庸有天然抵触，通常在复杂系统中表现卓越。", pros:["极强的独立判断力","长远战略思维","高度自律与执行力"], cons:["过于苛求完美","情感表达生硬","对他人意见可能过度轻视"], career:"适合：系统架构师、战略顾问、研究员、投资分析师。", growth:"尝试接纳不完美的过程。偶尔放下计划，允许自己感受当下。" },
             INTP: { title:"思想家 — INTP", desc:"你对世界充满好奇，擅长解构复杂理论。你更享受思考本身，而非结论。内向且分析性极强，是逻辑与创新的结合体。", pros:["深刻的分析与推理能力","极强的概念理解力","开放的思想体系"], cons:["拖延与执行力不足","社交兴趣低","理论与实践脱节"], career:"适合：哲学研究、软件工程、数学、独立创作。", growth:"将想法落地是最大挑战。找到一个能推动你执行的合作伙伴。" },
@@ -325,12 +294,7 @@ createApp({
                 data: {
                     labels: ['E', 'S', 'T', 'J'],
                     datasets: [{
-                        data: [
-                            percent.value.E,
-                            percent.value.S,
-                            percent.value.T,
-                            percent.value.J
-                        ],
+                        data: [ percent.value.E, percent.value.S, percent.value.T, percent.value.J ],
                         backgroundColor: 'rgba(0,0,0,0.05)',
                         borderColor: '#333',
                         borderWidth: 1,

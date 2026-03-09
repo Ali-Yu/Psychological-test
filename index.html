@@ -52,7 +52,8 @@
         <p class="a1" style="font-size:10px;letter-spacing:0.4em;color:#aaa;text-transform:uppercase;margin-bottom:16px;">Psychological Assessment Center</p>
         <h1 class="serif a2" style="font-size:26px;letter-spacing:0.3em;color:#222;margin-bottom:48px;">心理测评中心</h1>
         <div class="a3" style="margin-bottom:8px;">
-            <input v-model="code" type="text" maxlength="12" placeholder="请输入激活码" class="input-field" :disabled="loading" @keyup.enter="verify">
+            <input v-model="code" type="text" maxlength="12" placeholder="请输入激活码"
+                class="input-field" :disabled="loading" @keyup.enter="verify">
         </div>
         <div class="status-msg a3" :class="msgClass" style="margin-bottom:20px;">
             <span v-if="loading">验证中<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>
@@ -64,6 +65,7 @@
         <div class="test-badges a4">
             <span class="test-badge">MACH-IV</span>
             <span class="test-badge">MBTI</span>
+            <!-- 新增测试时在这里加一个 badge -->
         </div>
         <p style="margin-top:32px;font-size:10px;color:#bbb;line-height:2;letter-spacing:0.05em;" class="a4">
             激活码可在购买后的订单详情中获取<br>每个激活码仅限一次有效测评
@@ -80,18 +82,21 @@ createApp({
         const isError = ref(false);
         const msgClass = computed(() => loading.value ? 'loading' : (isError.value ? 'error' : ''));
         let msgTimer = null;
+
         const showMsg = (text, error = true) => {
             msg.value = text; isError.value = error;
             if (msgTimer) clearTimeout(msgTimer);
             if (error) msgTimer = setTimeout(() => { msg.value = ''; }, 3500);
         };
+
         const verify = async () => {
             const input = code.value.trim();
             if (!input) { showMsg('请输入激活码'); return; }
             if (loading.value) return;
             loading.value = true; msg.value = '';
             try {
-                const res  = await fetch('/.netlify/functions/verify', {
+                // Cloudflare Pages Functions 的请求地址格式：/functions/文件名
+                const res  = await fetch('/functions/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ code: input })
@@ -99,7 +104,9 @@ createApp({
                 const data = await res.json();
                 if (data.ok) {
                     showMsg('验证成功，正在跳转…', false);
-                    setTimeout(() => { window.location.href = `${data.target}?token=${data.token}`; }, 600);
+                    setTimeout(() => {
+                        window.location.href = `${data.target}?token=${data.token}`;
+                    }, 600);
                 } else {
                     showMsg(data.error || '验证失败，请重试');
                     loading.value = false;
@@ -109,6 +116,7 @@ createApp({
                 loading.value = false;
             }
         };
+
         return { code, loading, msg, msgClass, verify };
     }
 }).mount('#app');
