@@ -96,7 +96,7 @@ createApp({
             loading.value = true; msg.value = '';
             try {
                 // Cloudflare Pages Functions 的请求地址格式：/functions/文件名
-                const res  = await fetch('/functions/verify', {
+                const res  = await fetch('/api/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ code: input })
