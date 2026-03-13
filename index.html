@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>心理测评中心</title>
+    <title>认知科学硕士Ali</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -12,6 +12,24 @@
         body { font-family: 'Noto Sans SC', sans-serif; background: #f7f6f2; color: #333; min-height: 100vh; }
         .serif { font-family: 'Noto Serif SC', serif; }
         [v-cloak] { display: none; }
+
+        /* Profile image */
+        .profile-wrap {
+            width: 90px; height: 90px;
+            margin: 0 auto 32px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: none;
+            background: transparent;
+        }
+        .profile-wrap img {
+            width: 100%; height: 100%; object-fit: cover;
+            display: block;
+            transform: scale(0.7);
+            transform-origin: center;
+            /* scale(0.7) within a clipped circle: show 70% size inside the frame */
+        }
+
         .input-field {
             background: transparent; border: none; border-bottom: 1px solid #333;
             width: 100%; padding: 12px 0; text-align: center; outline: none;
@@ -20,37 +38,66 @@
         }
         .input-field::placeholder { color: #aaa; letter-spacing: 0.1em; }
         .input-field:focus { border-color: #000; }
+
+        /* Restyled button — narrower, grey */
         .btn-main {
-            width: 100%; padding: 16px; background: #222; color: #fff; border: none;
+            width: 60%; padding: 14px 0; background: #888; color: #fff; border: none;
             cursor: pointer; font-size: 11px; letter-spacing: 0.3em;
             font-family: 'Noto Sans SC', sans-serif; transition: background 0.3s;
         }
-        .btn-main:hover { background: #000; }
-        .btn-main:disabled { background: #999; cursor: not-allowed; }
+        .btn-main:hover { background: #666; }
+        .btn-main:disabled { background: #bbb; cursor: not-allowed; }
+
         .status-msg { font-size: 11px; text-align: center; height: 18px; transition: color 0.3s; }
         .status-msg.error   { color: #c0392b; }
         .status-msg.loading { color: #aaa; }
         .deco-line { width: 1px; height: 60px; background: #ccc; margin: 0 auto 40px; }
-        .test-badges { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 40px; }
-        .test-badge { border: 1px solid #ddd; padding: 6px 16px; font-size: 10px; letter-spacing: 0.2em; color: #aaa; background: #fff; }
+
         @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .a0 { animation: fadeUp 0.8s ease both; }
         .a1 { animation: fadeUp 0.8s 0.1s ease both; }
         .a2 { animation: fadeUp 0.8s 0.2s ease both; }
         .a3 { animation: fadeUp 0.8s 0.35s ease both; }
         .a4 { animation: fadeUp 0.8s 0.5s ease both; }
+        .a5 { animation: fadeUp 0.8s 0.65s ease both; }
+
         @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
         .dot { display:inline-block; animation: blink 1.2s infinite; }
         .dot:nth-child(2) { animation-delay: 0.2s; }
         .dot:nth-child(3) { animation-delay: 0.4s; }
+
+        /* ── Word Cloud ── */
+        .word-cloud-wrap {
+            position: relative;
+            width: 360px; height: 240px;
+            margin: 40px auto 0;
+            overflow: visible;
+        }
+        .cloud-word {
+            position: absolute;
+            font-family: 'Noto Sans SC', sans-serif;
+            color: #b0b0b0;
+            white-space: nowrap;
+            cursor: default;
+            user-select: none;
+            transform-origin: center;
+            transition: color 0.4s, opacity 0.4s;
+        }
+        .cloud-word:hover { color: #777; }
     </style>
 </head>
 <body>
 <div id="app" v-cloak style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
-    <div style="max-width:360px;width:100%;text-align:center;">
-        <div class="deco-line a0"></div>
-        <p class="a1" style="font-size:10px;letter-spacing:0.4em;color:#aaa;text-transform:uppercase;margin-bottom:16px;">Psychological Assessment Center</p>
-        <h1 class="serif a2" style="font-size:26px;letter-spacing:0.3em;color:#222;margin-bottom:48px;">心理测评中心</h1>
+    <div style="max-width:380px;width:100%;text-align:center;">
+
+        <!-- Profile image (70% scale) -->
+        <div class="profile-wrap a0">
+            <img src="profile.jpg" alt="profile" />
+        </div>
+
+        <p class="a1" style="font-size:9px;letter-spacing:0.25em;color:#aaa;text-transform:uppercase;margin-bottom:16px;white-space:nowrap;">Cognitive Psychological Assessment Center</p>
+        <h1 class="serif a2" style="font-size:26px;letter-spacing:0.3em;color:#222;margin-bottom:48px;">认知科学硕士Ali</h1>
+
         <div class="a3" style="margin-bottom:8px;">
             <input v-model="code" type="text" maxlength="12" placeholder="请输入激活码"
                 class="input-field" :disabled="loading" @keyup.enter="verify">
@@ -59,19 +106,19 @@
             <span v-if="loading">验证中<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>
             <span v-else-if="msg">{{ msg }}</span>
         </div>
-        <div class="a4">
+        <div class="a4" style="display:flex;justify-content:center;">
             <button class="btn-main" :disabled="loading" @click="verify">验证并进入测试</button>
         </div>
-        <div class="test-badges a4">
-            <span class="test-badge">MACH-IV</span>
-            <span class="test-badge">MBTI</span>
-            <!-- 新增测试时在这里加一个 badge -->
-        </div>
-        <p style="margin-top:32px;font-size:10px;color:#bbb;line-height:2;letter-spacing:0.05em;" class="a4">
+
+        <!-- Animated Word Cloud -->
+        <div class="word-cloud-wrap a5" id="wordCloud"></div>
+
+        <p style="margin-top:36px;font-size:10px;color:#bbb;line-height:2;letter-spacing:0.05em;" class="a5">
             激活码可在购买后的订单详情中获取<br>每个激活码仅限一次有效测评
         </p>
     </div>
 </div>
+
 <script>
 const { createApp, ref, computed } = Vue;
 createApp({
@@ -95,7 +142,6 @@ createApp({
             if (loading.value) return;
             loading.value = true; msg.value = '';
             try {
-                // Cloudflare Pages Functions 的请求地址格式：/functions/文件名
                 const res  = await fetch('/api/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -120,6 +166,91 @@ createApp({
         return { code, loading, msg, msgClass, verify };
     }
 }).mount('#app');
+
+/* ── Word Cloud Engine ── */
+(function() {
+    const words = [
+        { text: 'MACH-IV',       size: 15, weight: 600 },
+        { text: 'MBTI',          size: 18, weight: 600 },
+        { text: 'EPQ',           size: 12, weight: 400 },
+        { text: 'SCL-90',        size: 11, weight: 400 },
+        { text: 'Go/No-Go',      size: 13, weight: 400 },
+        { text: 'Stroop Task',   size: 12, weight: 400 },
+        { text: 'Iowa Gambling', size: 10, weight: 300 },
+        { text: 'N-Back',        size: 13, weight: 400 },
+        { text: 'BIS/BAS',       size: 11, weight: 400 },
+        { text: 'Dark Triad',    size: 14, weight: 500 },
+        { text: 'Flanker',       size: 11, weight: 300 },
+        { text: 'SDS',           size: 12, weight: 400 },
+        { text: 'NEO-PI',        size: 13, weight: 500 },
+        { text: 'Stop Signal',   size: 10, weight: 300 },
+        { text: 'AQ',            size: 11, weight: 400 },
+        { text: 'STAI',          size: 12, weight: 400 },
+        { text: 'PHQ-9',         size: 11, weight: 400 },
+    ];
+
+    const container = document.getElementById('wordCloud');
+    const W = 320, H = 200;
+    const cx = W / 2, cy = H / 2;
+
+    // Place words in rough ellipse, randomly scattered
+    const placed = [];
+
+    function overlap(a, b) {
+        return !(a.r + b.r < Math.hypot(a.x - b.x, a.y - b.y) - 4);
+    }
+
+    // Shuffle
+    const shuffled = [...words].sort(() => Math.random() - 0.5);
+
+    shuffled.forEach((w, i) => {
+        const el = document.createElement('span');
+        el.className = 'cloud-word';
+        el.textContent = w.text;
+        el.style.fontSize = w.size + 'px';
+        el.style.fontWeight = w.weight;
+        el.style.opacity = (0.45 + Math.random() * 0.55).toFixed(2);
+        container.appendChild(el);
+
+        // Try spiral placement
+        let placed_ok = false;
+        for (let angle = Math.random() * Math.PI * 2, r = 0; r < 160; angle += 0.5, r += 1.5) {
+            const ex = cx + r * Math.cos(angle) * 1.6 - (w.size * w.text.length * 0.32);
+            const ey = cy + r * Math.sin(angle) * 0.7 - w.size / 2;
+            const approxR = (w.size * w.text.length * 0.32 + w.size) / 2;
+            const candidate = { x: ex + approxR, y: ey + w.size / 2, r: approxR };
+            if (!placed.some(p => overlap(p, candidate))) {
+                el.style.left = ex + 'px';
+                el.style.top  = ey + 'px';
+                placed.push(candidate);
+                placed_ok = true;
+                break;
+            }
+        }
+        if (!placed_ok) { el.style.display = 'none'; }
+
+        // Individual gentle float animation
+        const duration  = 4 + Math.random() * 6;   // 4–10 s
+        const delay     = Math.random() * 6;
+        const driftX    = (Math.random() - 0.5) * 12;
+        const driftY    = (Math.random() - 0.5) * 8;
+        const rot       = (Math.random() - 0.5) * 8;
+
+        el.style.animation = 'none';
+        const keyframeName = `float${i}`;
+        const sheet = document.styleSheets[0];
+        try {
+            sheet.insertRule(`@keyframes ${keyframeName} {
+                0%   { transform: translate(0,0) rotate(0deg); }
+                33%  { transform: translate(${driftX * 0.5}px, ${driftY}px) rotate(${rot * 0.5}deg); }
+                66%  { transform: translate(${driftX}px, ${driftY * 0.3}px) rotate(${rot}deg); }
+                100% { transform: translate(0,0) rotate(0deg); }
+            }`, sheet.cssRules.length);
+        } catch(e) {}
+
+        el.style.animation = `${keyframeName} ${duration}s ${delay}s ease-in-out infinite`;
+    });
+})();
 </script>
 </body>
 </html>
