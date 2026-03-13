@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NPI-16 自恋人格测评</title>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{font-family:'Noto Sans SC',sans-serif;background:#f7f6f2;color:#333}
+.serif{font-family:'Noto Serif SC',serif}
+
+.fade-enter-active,.fade-leave-active{
+transition:opacity .4s,transform .4s
+}
+
+.fade-enter-from{opacity:0;transform:translateY(10px)}
+.fade-leave-to{opacity:0;transform:translateY(-10px)}
+
+.option-btn{
+transition:.3s;
+border-bottom:1px solid #e5e5e5
+}
+
+.option-btn:hover{
+background:#fff;
+padding-left:1.5rem;
+border-color:#333
+}
+
+.progress-line{height:1px;background:#e5e5e5}
+.progress-fill{height:1px;background:#333;transition:.6s}
+
+[v-cloak]{display:none}
+</style>
+</head>
+
+<body class="antialiased">
+
+<div id="app" v-cloak class="max-w-xl mx-auto px-6 py-20">
+
+<header v-if="!finished" class="mb-16 border-l-2 border-black pl-6">
+<h1 class="text-2xl serif tracking-widest">NPI-16</h1>
+<h2 class="text-sm text-gray-400 uppercase tracking-widest mt-1">
+Narcissistic Personality Inventory
+</h2>
+</header>
+
+<transition name="fade" mode="out-in">
+
+<!-- 题目 -->
+<div v-if="!finished" :key="index">
+
+<div class="progress-line mb-12">
+<div class="progress-fill"
+:style="{width:(index/questions.length*100)+'%'}">
+</div>
+</div>
+
+<p class="text-xs text-gray-400 mb-4">
+QUESTION {{index+1}} / 16
+</p>
+
+<h3 class="text-xl serif mb-12">
+{{questions[index].text}}
+</h3>
+
+<div class="space-y-1">
+
+<button
+v-for="opt in questions[index].options"
+@click="answer(opt.score)"
+class="option-btn w-full py-5 text-left text-sm text-gray-500 hover:text-black">
+
+{{opt.label}}
+
+</button>
+
+</div>
+
+<div class="mt-16 text-xs text-gray-300">
+SCORE {{totalAnswered}} / 16
+</div>
+
+</div>
+
+<!-- 结果 -->
+<div v-else class="bg-white p-10 border shadow-sm">
+
+<div class="text-center mb-12">
+
+<span class="text-xs tracking-widest text-gray-400">
+NPI REPORT
+</span>
+
+<h2 class="text-4xl serif mt-6 font-bold">
+{{result.level}}
+</h2>
+
+<p class="text-sm text-gray-400">
+自恋人格倾向分析
+</p>
+
+</div>
+
+<div class="flex flex-col items-center gap-8 mb-12">
+
+<div class="w-56 h-56">
+<canvas id="chart"></canvas>
+</div>
+
+<div class="text-center">
+
+<p class="text-lg serif">
+得分 {{score}} / 16
+</p>
+
+<p class="text-sm text-gray-500 mt-2">
+{{result.desc}}
+</p>
+
+</div>
+
+</div>
+
+<div class="space-y-10 text-left border-t pt-10">
+
+<section>
+
+<h4 class="text-xs text-gray-400 mb-4 uppercase">
+/ 特征
+</h4>
+
+<ul class="text-sm space-y-2 text-gray-600">
+
+<li v-for="p in result.traits">
+• {{p}}
+</li>
+
+</ul>
+
+</section>
+
+<section>
+
+<h4 class="text-xs text-gray-400 mb-4 uppercase">
+/ 建议
+</h4>
+
+<p class="text-sm text-gray-500">
+{{result.advice}}
+</p>
+
+</section>
+
+</div>
+
+<div class="mt-12 text-center text-xs text-gray-400">
+
+📷 建议截图保存结果
+
+</div>
+
+</div>
+
+</transition>
+
+</div>
+
+<script>
+const {createApp,ref,computed,nextTick}=Vue
+
+createApp({
+
+setup(){
+
+const index=ref(0)
+const finished=ref(false)
+const answers=ref([])
+
+const questions=[
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我天生适合领导别人",score:1},
+{label:"领导不是我特别追求的角色",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我喜欢成为注意力中心",score:1},
+{label:"我更喜欢低调",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我认为自己很特别",score:1},
+{label:"我和大多数人差不多",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我喜欢别人仰慕我",score:1},
+{label:"我不太在意别人是否仰慕我",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我比大多数人更优秀",score:1},
+{label:"我只是普通人",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我喜欢被关注",score:1},
+{label:"我更喜欢安静环境",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我觉得我应该得到特别待遇",score:1},
+{label:"每个人都应该被平等对待",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我喜欢炫耀自己的成就",score:1},
+{label:"我不喜欢炫耀",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我希望别人注意到我的成功",score:1},
+{label:"成功是否被注意无所谓",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我经常幻想巨大成功",score:1},
+{label:"我比较现实",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我希望成为重要人物",score:1},
+{label:"我不追求地位",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我喜欢掌控局面",score:1},
+{label:"我不太在意控制",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我喜欢别人称赞我",score:1},
+{label:"称赞对我不重要",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我觉得自己很有影响力",score:1},
+{label:"我只是普通影响力",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我希望别人羡慕我",score:1},
+{label:"我不希望别人羡慕",score:0}
+]
+},
+
+{
+text:"以下哪个更符合你？",
+options:[
+{label:"我认为自己值得被注意",score:1},
+{label:"我不需要特别关注",score:0}
+]
+}
+
+]
+
+function answer(v){
+
+answers.value[index.value]=v
+
+if(index.value<questions.length-1){
+
+index.value++
+
+}else{
+
+finished.value=true
+nextTick(renderChart)
+
+}
+
+}
+
+const totalAnswered=computed(()=>answers.value.length)
+
+const score=computed(()=>answers.value.reduce((a,b)=>a+b,0))
+
+const result=computed(()=>{
+
+if(score.value<=5){
+
+return{
+level:"低自恋倾向",
+desc:"你更倾向谦逊与现实主义，对外部认可需求较低。",
+traits:[
+"较低的自我夸大",
+"较高的共情能力",
+"较少寻求注意"
+],
+advice:"保持健康自信，同时避免过度自我否定。"
+}
+
+}
+
+if(score.value<=10){
+
+return{
+level:"中等自恋倾向",
+desc:"你在自信与谦逊之间保持平衡。",
+traits:[
+"适度自信",
+"有一定竞争意识",
+"重视他人评价"
+],
+advice:"维持这种平衡，同时关注他人的感受。"
+}
+
+}
+
+return{
+
+level:"较高自恋倾向",
+desc:"你具有较强的自我关注与成就驱动力。",
+traits:[
+"高度自信",
+"渴望认可",
+"追求地位与影响力"
+],
+advice:"保持自信，同时注意避免忽视他人的感受。"
+
+}
+
+})
+
+let chart=null
+
+function renderChart(){
+
+const ctx=document.getElementById("chart")
+
+chart=new Chart(ctx,{
+type:"radar",
+data:{
+labels:["Self-focus","Leadership","Recognition","Status"],
+datasets:[{
+data:[
+score.value*6,
+score.value*5,
+score.value*6,
+score.value*5
+],
+backgroundColor:"rgba(0,0,0,0.05)",
+borderColor:"#333"
+}]
+},
+options:{
+plugins:{legend:{display:false}},
+scales:{r:{min:0,max:100,ticks:{display:false}}}
+}
+})
+
+}
+
+return{
+questions,index,answer,totalAnswered,finished,score,result
+}
+
+}
+
+}).mount("#app")
+</script>
+
+</body>
+</html>

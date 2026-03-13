@@ -19,3 +19,11 @@
 [https://psychological-test-sooty.vercel.app/](https://psychological-test-alis-projects-1493a1cf.vercel.app/)machiavellianism 
 [https://psychological-test-sooty.vercel.app/](https://psychological-test-alis-projects-1493a1cf.vercel.app/)mbti
 
+# 4. 每次新增
+只需在 Cloudflare Dashboard 的环境变量 CODES 中，按已有格式添加新激活码即可：
+CODES = ABC123:npi16.html,XYZ789:npi16.html,MACH01:mach4.html
+格式规则：激活码:目标页面文件名，多个用逗号分隔。
+
+https://dash.cloudflare.com/795ca7cc3c2408e8c30eeb8ef1a1da29/pages/view/psychological-test/ae1b5bfc-1a90-4f2a-a7f5-0281b898519a
+查看详细信息
+
