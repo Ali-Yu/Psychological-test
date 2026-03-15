@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PHQ-9 抑郁症状筛查报告</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+        body { font-family: 'Noto Sans SC', sans-serif; background-color: #f7f6f2; color: #333333; }
+        .serif { font-family: 'Noto Serif SC', serif; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.4s ease, transform 0.4s ease; }
+        .fade-enter-from { opacity: 0; transform: translateY(10px); }
+        .fade-leave-to   { opacity: 0; transform: translateY(-10px); }
+        .option-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .option-btn:hover { background-color: #fff; padding-left: 1.5rem; border-color: #333; }
+        [v-cloak] { display: none; }
+        .progress-line { height: 1px; background: #e5e5e5; }
+        .progress-fill { height: 1px; background: #333; transition: width 0.6s ease; }
+        .save-btn { transition: all 0.3s ease; }
+        .save-btn:hover { background: #333; color: #fff; }
+        .save-btn:active { transform: scale(0.97); }
+        .score-gauge-track { height: 6px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
+        .score-gauge-fill  { height: 6px; border-radius: 3px; transition: width 1s ease; }
+        .q9-card { border-left: 3px solid #e5e5e5; }
+    </style>
+</head>
+<body class="antialiased">
+
+<script>
+(function () {
+    const p     = new URLSearchParams(location.search);
+    const token = p.get('token') || '';
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const parts = token.split('.');
+    if (parts.length !== 2 || parts[0] !== today) {
+        location.replace('index.html');
+    }
+})();
+</script>
+
+<div id="app" v-cloak class="max-w-xl mx-auto px-6 py-20">
+
+    <!-- 免责声明页 -->
+    <transition name="fade" mode="out-in">
+    <div v-if="showDisclaimer" key="disclaimer" class="bg-white p-8 shadow-sm border border-gray-100">
+        <div class="mb-8 border-l-2 border-black pl-6">
+            <h1 class="text-2xl font-light tracking-widest serif">PHQ-9</h1>
+            <h2 class="text-sm text-gray-400 mt-1 uppercase tracking-widest">Patient Health Questionnaire</h2>
+        </div>
+        <div class="space-y-4 text-xs text-gray-500 leading-relaxed mb-8">
+            <p class="font-medium text-gray-700 text-sm">请在开始前阅读以下说明</p>
+            <p>PHQ-9 是经过广泛验证的抑郁症状<strong>筛查工具</strong>，用于了解你在过去两周内的情绪和身体状态。</p>
+            <p class="bg-gray-50 p-4 rounded-sm text-gray-600">
+                ⚠️ <strong>重要提示：</strong>本测评结果<strong>不构成任何医学诊断</strong>。如果测评结果提示你可能存在抑郁症状，强烈建议你寻求专业心理健康服务。
+            </p>
+            <p>如果你目前正在经历严重的情绪困扰，可以随时联系：</p>
+            <ul class="space-y-1 pl-4">
+                <li>· 北京心理危机研究与干预中心：<strong>010-82951332</strong></li>
+                <li>· 全国心理援助热线：<strong>400-161-9995</strong></li>
+                <li>· 生命热线：<strong>400-821-1215</strong></li>
+            </ul>
+            <p class="text-gray-400">请如实回答每道题，选择最符合你近两周实际感受的选项。</p>
+        </div>
+        <button @click="showDisclaimer = false"
+                class="w-full py-4 border border-gray-300 text-xs tracking-widest text-gray-600 hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all">
+            我已了解，开始测评 →
+        </button>
+    </div>
+
+    <!-- 答题页 -->
+    <div v-else-if="!isFinished" key="quiz">
+        <header class="mb-16 border-l-2 border-black pl-6">
+            <h1 class="text-2xl font-light tracking-widest serif">PHQ-9</h1>
+            <h2 class="text-sm text-gray-400 mt-1 uppercase tracking-widest">Patient Health Questionnaire</h2>
+        </header>
+
+        <transition name="fade" mode="out-in">
+        <div :key="currentIndex">
+            <div class="progress-line mb-12">
+                <div class="progress-fill" :style="{ width: `${(currentIndex / questions.length) * 100}%` }"></div>
+            </div>
+            <div class="mb-12">
+                <p class="text-xs text-gray-400 mb-3 tracking-tighter">— QUESTION {{ currentIndex + 1 }} / 9</p>
+                <p class="text-xs text-gray-300 mb-5 tracking-wide">在过去两周内，以下情况出现的频率是？</p>
+
+                <!-- 第9题特殊提示 -->
+                <div v-if="currentIndex === 8" class="q9-card pl-4 mb-6 py-2">
+                    <p class="text-[10px] text-gray-400 leading-relaxed">
+                        这道题涉及敏感内容。无论你的选择是什么，本测评结果均不会被储存或记录。如果你正在经历相关困扰，请拨打心理援助热线 <strong>400-161-9995</strong>。
+                    </p>
+                </div>
+
+                <h3 class="text-xl md:text-2xl leading-relaxed serif font-medium text-gray-800">
+                    {{ questions[currentIndex].text }}
+                </h3>
+            </div>
+            <div class="space-y-1">
+                <button
+                    v-for="opt in options" :key="opt.value"
+                    @click="handleAnswer(opt.value)"
+                    class="option-btn w-full py-5 text-left flex justify-between items-center group"
+                >
+                    <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">{{ opt.label }}</span>
+                    <span class="text-xs text-gray-200 group-hover:text-gray-400">{{ opt.value }}</span>
+                </button>
+            </div>
+            <div class="mt-16 flex justify-start items-center text-xs tracking-widest text-gray-300">
+                <button @click="prevQuestion" v-if="currentIndex > 0" class="hover:text-black transition-colors">BACK</button>
+                <span v-else>&nbsp;</span>
+            </div>
+        </div>
+        </transition>
+    </div>
+
+    <!-- 结果页 -->
+    <div v-else key="result" class="bg-white p-8 md:p-12 shadow-sm border border-gray-100">
+
+        <!-- 标题 -->
+        <div class="text-center mb-12">
+            <span class="text-xs tracking-[0.3em] text-gray-400 border-b border-gray-200 pb-2">测评报告书</span>
+            <h2 class="text-3xl serif mt-8 font-bold text-gray-900">抑郁症状筛查结果</h2>
+            <p class="text-sm text-gray-400 mt-2 italic">Assessment ID: {{ assessmentId }}</p>
+            <p class="text-xs text-gray-300 mt-1">评估时间窗：过去两周</p>
+        </div>
+
+        <!-- 分数展示 + 量尺 -->
+        <div class="mb-16">
+            <div class="flex items-end justify-between mb-6">
+                <div>
+                    <div class="text-xs text-gray-400 uppercase tracking-widest mb-2">Total Score</div>
+                    <div class="text-6xl serif font-light text-gray-900">{{ finalScore }}</div>
+                    <div class="text-[10px] text-gray-300 mt-1">Range: 0 – 27</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-gray-400 uppercase tracking-widest mb-2">Severity Level</div>
+                    <div class="text-lg serif font-medium" :class="interpretation.titleColor">
+                        {{ interpretation.level }}
+                    </div>
+                    <div class="text-[10px] text-gray-400 mt-1">{{ interpretation.cutoff }}</div>
+                </div>
+            </div>
+
+            <!-- 分段量尺 -->
+            <div class="space-y-2 mb-4">
+                <div class="flex h-3 rounded-sm overflow-hidden gap-0.5">
+                    <div class="flex-1 bg-gray-100 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-gray-400">0–4</div>
+                    </div>
+                    <div class="flex-1 bg-gray-200 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-gray-500">5–9</div>
+                    </div>
+                    <div class="flex-1 bg-gray-400 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-white">10–14</div>
+                    </div>
+                    <div class="flex-1 bg-gray-600 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-white">15–19</div>
+                    </div>
+                    <div class="flex-1 bg-gray-900 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-white">20–27</div>
+                    </div>
+                </div>
+                <!-- 分数指针 -->
+                <div class="relative h-3">
+                    <div class="absolute top-0 w-0.5 h-3 bg-black transition-all duration-700"
+                         :style="{ left: `calc(${Math.min(finalScore / 27 * 100, 98)}%)` }">
+                    </div>
+                </div>
+                <div class="flex justify-between text-[8px] text-gray-300">
+                    <span>无症状</span><span>轻度</span><span>中度</span><span>中重度</span><span>重度</span>
+                </div>
+            </div>
+
+            <!-- 九项得分明细 -->
+            <div class="mt-8 space-y-2">
+                <div class="text-xs text-gray-400 uppercase tracking-widest mb-3">Item Breakdown</div>
+                <div v-for="(q, i) in questions" :key="i" class="flex items-center gap-3">
+                    <span class="text-[9px] text-gray-300 w-4 flex-shrink-0">{{ i+1 }}</span>
+                    <div class="flex-1 score-gauge-track">
+                        <div class="score-gauge-fill"
+                             :style="{ width: (answers[i] / 3 * 100) + '%', background: answers[i] >= 2 ? '#333' : '#bbb' }">
+                        </div>
+                    </div>
+                    <span class="text-[9px] text-gray-400 w-3 flex-shrink-0">{{ answers[i] }}</span>
+                    <span class="text-[9px] text-gray-300 w-24 flex-shrink-0 truncate">{{ q.shortLabel }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="space-y-8 text-left border-t border-gray-100 pt-10">
+
+            <!-- 核心摘要 -->
+            <section>
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-4 uppercase">/ 核心摘要</h4>
+                <p class="text-lg serif leading-relaxed text-gray-800 mb-3">{{ interpretation.title }}</p>
+                <p class="text-sm leading-relaxed text-gray-500">{{ interpretation.desc }}</p>
+            </section>
+
+            <!-- 第9题特殊处理 -->
+            <section v-if="answers[8] >= 1" class="bg-gray-50 border border-gray-200 p-5 rounded-sm">
+                <h4 class="text-xs font-bold tracking-widest text-gray-500 mb-3 uppercase">/ 关于第9题的说明</h4>
+                <p class="text-xs text-gray-600 leading-relaxed mb-3">
+                    你对第9题（有无念及死亡或自伤的想法）的回答提示需要额外关注。PHQ-9 第9题的任何阳性回答，不论分值高低，均建议你寻求专业评估。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed">
+                    这不一定意味着危机，但专业人士能帮助你更好地理解和应对这些想法。请考虑联系心理咨询师或拨打援助热线：<strong class="text-gray-700">400-161-9995</strong>
+                </p>
+            </section>
+
+            <!-- 建议行动 -->
+            <section>
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 建议行动</h4>
+                <ul class="text-xs text-gray-600 space-y-2">
+                    <li v-for="a in interpretation.actions" class="flex items-start">
+                        <span class="w-1 h-1 bg-black mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ a }}
+                    </li>
+                </ul>
+            </section>
+
+            <!-- 自我调节资源 -->
+            <section v-if="finalScore >= 5">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 循证自我调节方法</h4>
+                <ul class="text-xs text-gray-600 space-y-2">
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span>行为激活（Behavioral Activation）：每天安排一项小的愉悦活动，哪怕只有15分钟</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span>规律作息：固定起床时间是改善情绪节律的最有效单一行为</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span>温和运动：每周150分钟中等强度运动对轻中度抑郁症状有显著缓解效果（Kvam et al., 2016）</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span>社会连接：主动联系一位你信任的人，即使只是简短的交流</li>
+                </ul>
+            </section>
+
+            <!-- 深度解析 -->
+            <section class="bg-gray-50 p-6 rounded-sm">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 深度解析录</h4>
+                <p class="text-xs leading-loose text-gray-500 italic">"{{ interpretation.insight }}"</p>
+            </section>
+
+            <!-- 参考常模与研究背景 -->
+            <section class="border border-gray-100 p-5 rounded-sm">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 参考常模与研究背景</h4>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    PHQ-9 由 Kroenke、Spitzer 与 Williams 于 2001 年开发，是基于 DSM 诊断标准的九条抑郁症状量表，0–3 分四级计分，总分范围 0–27 分。已被译为 <strong>70 余种语言</strong>，是全球初级医疗系统中使用最广泛的抑郁筛查工具，版权归 Pfizer 所有并免费开放使用。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    <strong>信效度：</strong>原版研究（N = 6,000）Cronbach's α = 0.86–0.89，与 SF-20 心理健康分量表相关 r = 0.73；以精神科专业面谈为金标准的效标效度研究显示灵敏度 88%、特异度 88%（Kroenke et al., 2001）。中文版在精神科住院/门诊患者中 α = 0.892，重测信度 r = 0.737；在中国普通社区人群中 α = 0.86，ROC 曲线下面积 = 0.92。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    <strong>分段临界值（国际标准）：</strong>5、10、15、20 分分别为轻度、中度、中重度、重度抑郁的临界分值。中国普通人群研究推荐以 ≥7 分作为筛查临界值（灵敏度 0.86，特异度 0.86），本报告同时参考两套标准。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    <strong>普通人群分布：</strong>Kocalevent et al.（2013）对 5,018 名普通人群的研究显示，76.4% 的人得分在 0–4 分，18% 得分在 5–9 分，4.3% 得分在 10–14 分，仅 1.3% 得分 ≥ 15 分。女性平均得分普遍高于男性约 1–2 分。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed">
+                    <strong>重要局限：</strong>PHQ-9 为<em>筛查工具</em>而非诊断工具。仅凭量表分数<strong>无法做出抑郁症诊断</strong>，须由经过训练的临床专业人员结合完整评估方可诊断。躯体疾病、药物副作用等因素均可导致分数偏高。若 PHQ-9 得分 ≥ 10，强烈建议进行专业评估。
+                </p>
+            </section>
+
+            <!-- 专业资源 -->
+            <section class="border border-gray-200 p-5 rounded-sm">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 寻求帮助</h4>
+                <div class="text-xs text-gray-500 space-y-2">
+                    <p>如你的得分在中度及以上，或你感到难以独自应对，请考虑以下资源：</p>
+                    <ul class="space-y-1.5 mt-2">
+                        <li>· <strong class="text-gray-700">北京心理危机研究与干预中心</strong>：010-82951332</li>
+                        <li>· <strong class="text-gray-700">全国心理援助热线</strong>：400-161-9995</li>
+                        <li>· <strong class="text-gray-700">生命热线</strong>：400-821-1215（24小时）</li>
+                        <li>· <strong class="text-gray-700">简单心理 / 壹心理</strong>：在线预约专业心理咨询师</li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+
+        <!-- 底部 -->
+        <div class="mt-16 pt-8 border-t border-gray-100 text-center">
+            <div class="text-[10px] text-gray-300 uppercase italic">Based on PHQ-9 · Kroenke, Spitzer &amp; Williams (2001)</div>
+            <button
+                @click="saveAsImage"
+                :disabled="isSaving"
+                class="save-btn mt-6 px-6 py-3 border border-gray-300 text-xs tracking-widest text-gray-500 rounded-sm w-full"
+            >
+                <span v-if="!isSaving">📷 &nbsp;保存报告为图片</span>
+                <span v-else class="text-gray-300">生成中，请稍候…</span>
+            </button>
+            <p class="text-[10px] text-gray-300 mt-3">报告不会被储存，关闭页面后将无法找回</p>
+            <a href="index.html" class="mt-4 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
+                ← Return to Center
+            </a>
+        </div>
+
+    </div>
+    </transition>
+</div>
+
+<script>
+const { createApp, ref, computed, nextTick } = Vue;
+
+createApp({
+    setup() {
+        const showDisclaimer = ref(true);
+        const currentIndex   = ref(0);
+        const answers        = ref([]);
+        const isFinished     = ref(false);
+        const assessmentId   = ref(Math.random().toString(36).substr(2, 9).toUpperCase());
+        const isSaving       = ref(false);
+
+        const options = [
+            { label: '完全没有',       value: 0 },
+            { label: '有几天',         value: 1 },
+            { label: '超过一半的天数', value: 2 },
+            { label: '几乎每天',       value: 3 },
+        ];
+
+        // PHQ-9 标准9题（基于 DSM 抑郁症诊断标准）
+        const questions = [
+            { text: '做事时提不起劲或没有兴趣',                         shortLabel: '兴趣缺失' },
+            { text: '感到心情低落、沮丧或绝望',                         shortLabel: '情绪低落' },
+            { text: '入睡困难、睡不安稳或睡眠过多',                     shortLabel: '睡眠问题' },
+            { text: '感到疲倦或没有活力',                               shortLabel: '疲乏无力' },
+            { text: '食欲不振或吃太多',                                 shortLabel: '食欲变化' },
+            { text: '觉得自己很糟糕，或觉得自己是个失败者，或让家人或自己失望', shortLabel: '自我否定' },
+            { text: '对事物专注有困难，例如看报纸或看电视时',           shortLabel: '注意力下降' },
+            { text: '动作或说话速度缓慢到别人已经察觉，或正好相反——烦躁或坐立不安、动来动去的情况更胜于平常', shortLabel: '精神运动变化' },
+            { text: '有不如死掉或用某种方式伤害自己的念头',             shortLabel: '自伤念头' },
+        ];
+
+        const handleAnswer = (val) => {
+            answers.value[currentIndex.value] = val;
+            if (currentIndex.value < questions.length - 1) {
+                currentIndex.value++;
+            } else {
+                isFinished.value = true;
+            }
+        };
+
+        const prevQuestion = () => { if (currentIndex.value > 0) currentIndex.value--; };
+
+        const finalScore = computed(() =>
+            answers.value.slice(0, 9).reduce((a, v) => a + (v || 0), 0)
+        );
+
+        const interpretation = computed(() => {
+            const s = finalScore.value;
+            if (s >= 20) return {
+                level: '重度抑郁症状',
+                cutoff: '20–27 分',
+                titleColor: 'text-gray-900',
+                title: '症状严重——请尽快寻求专业支持',
+                desc: '你的得分处于重度区间，提示你在过去两周内经历了频繁且严重的抑郁症状，这已对日常功能造成显著影响。重度抑郁是可以治疗的，但它需要专业的临床评估和干预，而不仅仅是自我调节。请尽快联系精神科医生或心理健康专业人员。',
+                actions: [
+                    '尽快（建议本周内）联系精神科医生或心理咨询师进行专业评估',
+                    '如有自伤或轻生的念头，请立即拨打 400-161-9995 或前往最近的急诊',
+                    '告知一位你信任的亲友你目前的状态，不要独自承受',
+                    '暂时减少重大决策，给自己争取专业帮助的时间',
+                ],
+                insight: '抑郁不是性格软弱，也不是"想太多"。它是一种有神经生物学基础的健康状况，就像骨折需要打石膏，重度抑郁症状需要专业治疗。向外寻求帮助，是勇气而非软弱的表现。',
+            };
+            if (s >= 15) return {
+                level: '中重度抑郁症状',
+                cutoff: '15–19 分',
+                titleColor: 'text-gray-800',
+                title: '症状明显——建议主动寻求专业评估',
+                desc: '你的得分提示中重度抑郁症状水平。这意味着你在过去两周内有相当一部分时间受到抑郁症状的影响，日常工作、社交或自我照顾可能已出现明显困难。在这个分数段，单靠自我调节通常效果有限，专业支持往往是必要的。',
+                actions: [
+                    '建议在近期（2周内）安排一次心理健康专业评估',
+                    '可以从在线心理咨询平台（如简单心理、壹心理）开始，降低寻求帮助的门槛',
+                    '与家人或朋友分享你的感受，不要一个人扛',
+                    '暂时维持基本的生活节律（睡眠、饮食、轻度运动）',
+                ],
+                insight: '处于中重度区间的人，有时仍能维持表面的正常运作，这反而可能让你和周围的人都忽视了内心真实的重量。你值得被好好照顾——请给自己寻求帮助的机会。',
+            };
+            if (s >= 10) return {
+                level: '中度抑郁症状',
+                cutoff: '10–14 分',
+                titleColor: 'text-gray-700',
+                title: '情绪信号——值得认真对待的提示',
+                desc: '你的得分提示中度抑郁症状。这一区间的人通常能维持基本的日常功能，但内心承受着持续的情绪负担，精力、睡眠或自我评价可能已受到影响。中度症状是一个重要的"窗口期"——在这个阶段寻求支持往往比等待症状加重后更容易恢复。',
+                actions: [
+                    '认真考虑咨询心理健康专业人士，即使只是一次初步谈话',
+                    '记录情绪日记，追踪哪些情境会加重或减轻你的症状',
+                    '有意识地增加"愉悦活动"和社交互动，即使你暂时提不起兴趣',
+                    '关注睡眠质量和规律性，这是情绪恢复的基础',
+                ],
+                insight: '中度抑郁有时像一层持续的灰色滤镜——你仍然在运转，但世界失去了一些颜色。这不是"矫情"，而是你的神经系统在向你发出信号。倾听它，然后采取行动。',
+            };
+            if (s >= 5) return {
+                level: '轻度抑郁症状',
+                cutoff: '5–9 分',
+                titleColor: 'text-gray-600',
+                title: '轻度波动——值得关注的情绪状态',
+                desc: '你的得分提示轻度抑郁症状，处于需要留意但尚未到临床干预阈值的区间。这种程度的情绪波动在经历压力、生活变化或睡眠不足时较为常见。轻度症状通过自我调节往往能有效缓解，但如果持续超过两周或有加重趋势，建议寻求进一步支持。',
+                actions: [
+                    '注意识别可能的诱因（压力事件、睡眠不足、社交减少等）',
+                    '坚持规律睡眠、适度运动和有意义的社交活动',
+                    '两周后可再次完成测评，追踪情绪变化趋势',
+                    '如症状持续或加重，不要犹豫，及时寻求专业帮助',
+                ],
+                insight: '轻度症状是身心在提醒你：有些事情需要关注了。这是一个早期信号，而不是危机。温和地照顾自己，就像照顾一位正在感冒的朋友一样。',
+            };
+            return {
+                level: '无明显症状',
+                cutoff: '0–4 分',
+                titleColor: 'text-gray-500',
+                title: '目前状态良好——维持心理健康的意识',
+                desc: '你的得分提示在过去两周内没有明显的抑郁症状。这是积极的结果，但心理健康需要持续的关注和维护，就像身体健康一样。',
+                actions: [
+                    '继续保持当前的生活节律和社交连接',
+                    '了解抑郁症状的早期信号，以便在未来及时识别',
+                    '在压力较大时期主动使用放松和压力管理技巧',
+                    '如未来出现情绪变化，可随时重新完成测评作为参考',
+                ],
+                insight: '心理健康不只是"没有病"，而是具备弹性、连接感和对生活的投入感。你现在的状态是一个好的起点——继续滋养它。',
+            };
+        });
+
+        // 保存为图片
+        async function saveAsImage() {
+            isSaving.value = true;
+            await nextTick();
+            try {
+                const el = document.querySelector('#app > div.bg-white')
+                         || document.querySelector('#app .bg-white');
+                const canvas = await html2canvas(el, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                });
+                const link = document.createElement('a');
+                link.download = 'PHQ9-report.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (e) {
+                alert('保存失败，请尝试手动截图。');
+            } finally {
+                isSaving.value = false;
+            }
+        }
+
+        return {
+            showDisclaimer, currentIndex, questions, options,
+            handleAnswer, prevQuestion,
+            isFinished, finalScore, answers,
+            interpretation, assessmentId,
+            isSaving, saveAsImage,
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>

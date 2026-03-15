@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DISC 行为风格测评报告</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+        body { font-family: 'Noto Sans SC', sans-serif; background-color: #f7f6f2; color: #333333; }
+        .serif { font-family: 'Noto Serif SC', serif; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.4s ease, transform 0.4s ease; }
+        .fade-enter-from { opacity: 0; transform: translateY(10px); }
+        .fade-leave-to   { opacity: 0; transform: translateY(-10px); }
+        .option-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .option-btn:hover { background-color: #fff; padding-left: 1.5rem; border-color: #333; }
+        [v-cloak] { display: none; }
+        .progress-line { height: 1px; background: #e5e5e5; }
+        .progress-fill { height: 1px; background: #333; transition: width 0.6s ease; }
+        .save-btn { transition: all 0.3s ease; }
+        .save-btn:hover { background: #333; color: #fff; }
+        .save-btn:active { transform: scale(0.97); }
+        .disc-bar-track { height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; }
+        .disc-bar-fill { height: 8px; border-radius: 4px; transition: width 0.9s cubic-bezier(0.4,0,0.2,1); }
+    </style>
+</head>
+<body class="antialiased">
+
+<script>
+(function () {
+    const p     = new URLSearchParams(location.search);
+    const token = p.get('token') || '';
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const parts = token.split('.');
+    if (parts.length !== 2 || parts[0] !== today) {
+        location.replace('index.html');
+    }
+})();
+</script>
+
+<div id="app" v-cloak class="max-w-xl mx-auto px-6 py-20">
+
+    <!-- Header -->
+    <header v-if="!isFinished" class="mb-16 border-l-2 border-black pl-6">
+        <h1 class="text-2xl font-light tracking-widest serif">DISC</h1>
+        <h2 class="text-sm text-gray-400 mt-1 uppercase tracking-widest">Behavioral Style Assessment</h2>
+    </header>
+
+    <main>
+        <transition name="fade" mode="out-in">
+
+            <!-- 答题页 -->
+            <div v-if="!isFinished" :key="currentIndex">
+                <div class="progress-line mb-12">
+                    <div class="progress-fill" :style="{ width: `${(currentIndex / questions.length) * 100}%` }"></div>
+                </div>
+                <div class="mb-12">
+                    <p class="text-xs text-gray-400 mb-2 tracking-tighter">— QUESTION {{ currentIndex + 1 }} / 24</p>
+                    <p class="text-xs text-gray-300 mb-6 tracking-wide uppercase">{{ dimLabel[questions[currentIndex].dim] }}</p>
+                    <h3 class="text-xl md:text-2xl leading-relaxed serif font-medium text-gray-800">
+                        {{ questions[currentIndex].text }}
+                    </h3>
+                </div>
+                <div class="space-y-1">
+                    <button
+                        v-for="opt in options" :key="opt.value"
+                        @click="handleAnswer(opt.value)"
+                        class="option-btn w-full py-5 text-left flex justify-between items-center group"
+                    >
+                        <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">{{ opt.label }}</span>
+                    </button>
+                </div>
+                <div class="mt-16 flex justify-start items-center text-xs tracking-widest text-gray-300">
+                    <button @click="prevQuestion" v-if="currentIndex > 0" class="hover:text-black transition-colors">BACK</button>
+                    <span v-else>&nbsp;</span>
+                </div>
+            </div>
+
+            <!-- 结果页 -->
+            <div v-else key="result" class="bg-white p-8 md:p-12 shadow-sm border border-gray-100">
+
+                <!-- 标题 -->
+                <div class="text-center mb-12">
+                    <span class="text-xs tracking-[0.3em] text-gray-400 border-b border-gray-200 pb-2">测评报告书</span>
+                    <h2 class="text-3xl serif mt-8 font-bold text-gray-900">DISC 行为风格分析</h2>
+                    <p class="text-sm text-gray-400 mt-2 italic">Assessment ID: {{ assessmentId }}</p>
+                </div>
+
+                <!-- 主风格徽章 + 四维条形图 -->
+                <div class="mb-16">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <div class="text-xs text-gray-400 uppercase tracking-widest mb-2">Primary Style</div>
+                            <div class="flex items-end gap-3">
+                                <span class="text-5xl serif font-bold text-gray-900">{{ primaryStyle }}</span>
+                                <span class="text-sm text-gray-400 mb-1">{{ styleNames[primaryStyle] }}</span>
+                            </div>
+                            <div v-if="secondaryStyle" class="mt-2 text-xs text-gray-400">
+                                辅助风格：<span class="text-gray-600 font-medium">{{ secondaryStyle }} · {{ styleNames[secondaryStyle] }}</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-gray-400 uppercase tracking-widest mb-2">Blend Type</div>
+                            <div class="text-sm serif text-gray-700">{{ blendType }}</div>
+                        </div>
+                    </div>
+
+                    <!-- 四维度横向条形图 -->
+                    <div class="space-y-4">
+                        <div v-for="dim in dimBars" :key="dim.key">
+                            <div class="flex justify-between items-baseline mb-1.5">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-medium text-gray-800">{{ dim.key }}</span>
+                                    <span class="text-xs text-gray-400">{{ dim.name }}</span>
+                                </div>
+                                <span class="text-xs text-gray-400">{{ dim.score }} / 30</span>
+                            </div>
+                            <div class="disc-bar-track">
+                                <div class="disc-bar-fill"
+                                     :style="{ width: dim.pct + '%', background: dim.color }">
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-[9px] text-gray-300 mt-0.5">
+                                <span>低</span>
+                                <span :class="dim.pct > 60 ? 'text-gray-500' : ''">
+                                    {{ dim.pct >= 70 ? '显著主导' : dim.pct >= 50 ? '中高' : dim.pct >= 30 ? '中等' : '偏低' }}
+                                </span>
+                                <span>高</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-[9px] text-gray-300 mt-3 text-center">得分越高代表该行为风格维度越显著，各维度相互独立</p>
+                </div>
+
+                <!-- 内容区 -->
+                <div class="space-y-10 text-left border-t border-gray-100 pt-10">
+
+                    <!-- 核心性格摘要 -->
+                    <section>
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-4 uppercase">/ 核心风格摘要</h4>
+                        <p class="text-lg serif leading-relaxed text-gray-800 mb-3">{{ styleReport.title }}</p>
+                        <p class="text-sm leading-relaxed text-gray-500">{{ styleReport.desc }}</p>
+                    </section>
+
+                    <!-- 优势 / 盲点 -->
+                    <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 优势倾向</h4>
+                            <ul class="text-xs text-gray-600 space-y-2">
+                                <li v-for="p in styleReport.pros" class="flex items-start">
+                                    <span class="w-1 h-1 bg-black mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ p }}
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 潜在盲点</h4>
+                            <ul class="text-xs text-gray-600 space-y-2">
+                                <li v-for="c in styleReport.cons" class="flex items-start">
+                                    <span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ c }}
+                                </li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    <!-- 职场与沟通建议 -->
+                    <section>
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 职场与沟通风格</h4>
+                        <p class="text-xs text-gray-500 leading-relaxed">{{ styleReport.workplace }}</p>
+                    </section>
+
+                    <!-- 深度解析 -->
+                    <section class="bg-gray-50 p-6 rounded-sm">
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 深度解析录</h4>
+                        <p class="text-xs leading-loose text-gray-500 italic">"{{ styleReport.insight }}"</p>
+                    </section>
+
+                    <!-- 参考常模与研究背景 -->
+                    <section class="border border-gray-100 p-5 rounded-sm">
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 参考常模与研究背景</h4>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            DISC 行为风格理论由哈佛心理学博士 William Moulton Marston 于 1928 年在《正常人的情绪》（<em>Emotions of Normal People</em>）中首次提出，描述四种核心行为维度：支配（Dominance）、影响（Influence）、稳健（Steadiness）、谨慎（Conscientiousness）。首份正式自评量表由 Walter Clarke 于 1956 年开发，此后衍生出众多商业版本。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            <strong>信效度数据：</strong>基于 Cloverleaf 研究机构对标准24题版的独立验证（N = 10,000+），四维度内部一致性 α 分别为：D = .80，I = .72，S = .72，C = .60（Dust, 2024）。Everything DiSC 版本的中位数 α = .87，重测信度中位数 = .86，属良好至优秀区间（Wiley, 2013）。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            <strong>构效度：</strong>D 与 S 维度呈强负相关（r = −.81），I 与 C 维度呈强负相关（r = −.78），符合模型的环状结构预期（ASI 第三方认证）。与 NEO PI-R 和 16PF 的聚合效度研究提供了额外的构效支持。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            <strong>人口分布：</strong>Everything DiSC 标准化数据显示四种主风格在人群中分布大致均等（各约 25%）。性别差异总体较小：女性在 I、S 维度得分略高，男性在 D、C 维度得分略高，但效应量极小，民族和教育背景差异对风格判定几乎无实际影响。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed">
+                            <strong>使用建议：</strong>DISC 是描述性而非预测性工具，研究显示其<em>无法有效预测工作绩效</em>，<strong>不建议用于人才招募筛选</strong>。适合用于自我认知、团队沟通改善和职业发展规划。本测评为简版李克特格式，结果仅供参考。
+                        </p>
+                    </section>
+                </div>
+
+                <!-- 底部 -->
+                <div class="mt-16 pt-8 border-t border-gray-100 text-center">
+                    <div class="text-[10px] text-gray-300 uppercase italic">Based on DISC · Marston (1928) · Clarke (1956)</div>
+                    <button
+                        @click="saveAsImage"
+                        :disabled="isSaving"
+                        class="save-btn mt-6 px-6 py-3 border border-gray-300 text-xs tracking-widest text-gray-500 rounded-sm w-full"
+                    >
+                        <span v-if="!isSaving">📷 &nbsp;保存报告为图片</span>
+                        <span v-else class="text-gray-300">生成中，请稍候…</span>
+                    </button>
+                    <p class="text-[10px] text-gray-300 mt-3">报告不会被储存，关闭页面后将无法找回</p>
+                    <a href="index.html" class="mt-4 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
+                        ← Return to Center
+                    </a>
+                </div>
+
+            </div>
+        </transition>
+    </main>
+</div>
+
+<script>
+const { createApp, ref, computed, nextTick } = Vue;
+
+createApp({
+    setup() {
+        const currentIndex = ref(0);
+        const answers = ref([]);
+        const isFinished = ref(false);
+        const assessmentId = ref(Math.random().toString(36).substr(2, 9).toUpperCase());
+        const isSaving = ref(false);
+
+        const options = [
+            { label: '完全不符合', value: 1 },
+            { label: '不太符合',   value: 2 },
+            { label: '有时符合',   value: 3 },
+            { label: '比较符合',   value: 4 },
+            { label: '非常符合',   value: 5 },
+        ];
+
+        const dimLabel = {
+            D: 'D · 支配 Dominance',
+            I: 'I · 影响 Influence',
+            S: 'S · 稳健 Steadiness',
+            C: 'C · 谨慎 Conscientiousness',
+        };
+
+        // 24 题：每维度 6 题，顺序随机交叉排列
+        const questions = [
+            // D - 支配
+            { text: '面对挑战时，我会直接采取行动，而不是等待他人指示。',       dim: 'D' },
+            { text: '我享受主导决策的过程，不介意承担相应的风险。',             dim: 'D' },
+            { text: '当结果停滞不前时，我会主动推动变革，即使这会引起摩擦。',   dim: 'D' },
+            { text: '我做决定通常果断迅速，不喜欢拖延。',                       dim: 'D' },
+            { text: '我在竞争性环境中表现更好，压力能激发我的动力。',           dim: 'D' },
+            { text: '我倾向于直接说出想法，不太在意措辞是否会让人不舒服。',     dim: 'D' },
+            // I - 影响
+            { text: '我很容易与陌生人建立关系，社交场合让我充满活力。',         dim: 'I' },
+            { text: '我擅长用热情和感染力说服他人接受我的想法。',               dim: 'I' },
+            { text: '我喜欢在公众场合分享想法，享受被关注的感觉。',             dim: 'I' },
+            { text: '我能让团队氛围保持积极，即使面对困难也能鼓舞士气。',       dim: 'I' },
+            { text: '我倾向于相信他人，愿意给新认识的人机会和信任。',           dim: 'I' },
+            { text: '我做决定时更多依赖直觉和感受，而非数据和分析。',           dim: 'I' },
+            // S - 稳健
+            { text: '我喜欢稳定、可预期的工作环境，不喜欢频繁的突发变化。',     dim: 'S' },
+            { text: '帮助他人是我工作的重要动力，我重视团队的和谐氛围。',       dim: 'S' },
+            { text: '我做事有耐心，能够长期坚持，不轻易放弃。',                 dim: 'S' },
+            { text: '在冲突面前，我倾向于保持平静，努力调解而不是激化矛盾。',   dim: 'S' },
+            { text: '我是一个值得信赖的人，朋友和同事知道我会信守承诺。',       dim: 'S' },
+            { text: '在做重大决定前，我需要充分的时间来思考和适应。',           dim: 'S' },
+            // C - 谨慎
+            { text: '我在交出任何成果前，会反复检查以确保准确无误。',           dim: 'C' },
+            { text: '我重视规则和流程，认为遵循标准是保证质量的基础。',         dim: 'C' },
+            { text: '面对问题时，我倾向于收集充分信息后再做判断，不喜欢仓促决策。', dim: 'C' },
+            { text: '我对自己和他人的工作都有较高的质量标准。',                 dim: 'C' },
+            { text: '我善于分析复杂情况，喜欢用系统化的方法解决问题。',         dim: 'C' },
+            { text: '在批评或表扬他人之前，我会先确保有足够的事实依据。',       dim: 'C' },
+        ];
+
+        const handleAnswer = (val) => {
+            answers.value[currentIndex.value] = val;
+            if (currentIndex.value < questions.length - 1) {
+                currentIndex.value++;
+            } else {
+                isFinished.value = true;
+            }
+        };
+
+        const prevQuestion = () => { if (currentIndex.value > 0) currentIndex.value--; };
+
+        // 各维度原始分（6题 × 5分 = 最高30分）
+        const rawScores = computed(() => {
+            const s = { D: 0, I: 0, S: 0, C: 0 };
+            answers.value.forEach((val, i) => {
+                if (i < questions.length) s[questions[i].dim] += val;
+            });
+            return s;
+        });
+
+        // 百分比（用于条形图）
+        const dimBars = computed(() => {
+            const s = rawScores.value;
+            return [
+                { key: 'D', name: '支配 Dominance',       score: s.D, pct: Math.round(s.D / 30 * 100), color: '#1a1a1a' },
+                { key: 'I', name: '影响 Influence',       score: s.I, pct: Math.round(s.I / 30 * 100), color: '#555555' },
+                { key: 'S', name: '稳健 Steadiness',      score: s.S, pct: Math.round(s.S / 30 * 100), color: '#888888' },
+                { key: 'C', name: '谨慎 Conscientiousness', score: s.C, pct: Math.round(s.C / 30 * 100), color: '#bbbbbb' },
+            ];
+        });
+
+        // 主风格 = 最高分维度
+        const primaryStyle = computed(() => {
+            const s = rawScores.value;
+            return Object.entries(s).sort((a, b) => b[1] - a[1])[0][0];
+        });
+
+        // 辅助风格 = 第二高，且与主风格分差 ≤ 5分
+        const secondaryStyle = computed(() => {
+            const s = rawScores.value;
+            const sorted = Object.entries(s).sort((a, b) => b[1] - a[1]);
+            const gap = sorted[0][1] - sorted[1][1];
+            return gap <= 5 ? sorted[1][0] : null;
+        });
+
+        const styleNames = {
+            D: '支配型', I: '影响型', S: '稳健型', C: '谨慎型'
+        };
+
+        // 风格组合名称
+        const blendType = computed(() => {
+            const p = primaryStyle.value;
+            const s = secondaryStyle.value;
+            if (!s) return styleNames[p] + '（单一主导）';
+            const blends = {
+                'DI': '开拓驱动型', 'ID': '开拓驱动型',
+                'DC': '精准决策型', 'CD': '精准决策型',
+                'DS': '务实推进型', 'SD': '务实推进型',
+                'IS': '协作感召型', 'SI': '协作感召型',
+                'IC': '洞察影响型', 'CI': '洞察影响型',
+                'SC': '稳健执行型', 'CS': '稳健执行型',
+            };
+            return blends[p + s] || (styleNames[p] + ' + ' + styleNames[s]);
+        });
+
+        // 各主风格报告
+        const reports = {
+            D: {
+                title: '支配型 — 结果导向的行动者',
+                desc:  '你是天生的执行者和决策者。你对效率有本能的追求，在面对障碍时选择直接突破而非绕行。你的行动力和魄力让你在高压、高竞争的环境中往往能脱颖而出。研究显示，D 型风格在组织中往往集中于高管层和创业者群体。',
+                pros:  ['极强的行动力与结果导向', '果断的决策风格，不犹豫拖延', '在竞争和压力环境下越战越勇', '推动变革与打破常规的天然驱动力'],
+                cons:  ['可能忽视他人感受与流程细节', '在需要共识的情境中显得过于强势', '对过程的耐心不足，容易急于求成', '高压下可能引发团队抵触'],
+                workplace: '你在需要快速决策和结果交付的岗位上表现最佳——战略管理、创业、销售领导、项目总控。最适合与 C 型（提供细节把控）和 S 型（维护团队情绪）合作。与你沟通时，他人最好直接说重点，用数据支撑，不要绕弯子。',
+                insight: 'D 型的核心动力来自于对自主权和控制权的渴望。Marston 将其定义为"在不利环境中主动施加影响力"。当 D 型学会把控制感从"控制他人"转向"控制自己的反应"，往往能释放更大的领导力。',
+            },
+            I: {
+                title: '影响型 — 感召人心的连接者',
+                desc:  '你是人际关系的天才。你用热情、乐观和感染力影响周围的人，能够迅速建立信任并激励他人。你的存在让团队更具活力，是组织文化的重要塑造者。I 型风格在销售、公关、培训和创意行业中高度集中。',
+                pros:  ['天然的感染力与社交吸引力', '擅长激励他人，营造积极氛围', '创意充沛，善于头脑风暴', '快速建立关系，高度善于协作'],
+                cons:  ['注意力容易分散，执行细节把控不足', '情绪化决策，有时过于乐观', '回避负面反馈，不擅长处理冲突', '对时间管理和系统性工作相对不适应'],
+                workplace: '你在需要人际互动和创意表达的岗位上如鱼得水——演讲、销售、品牌营销、团队建设、客户关系。最适合与 C 型（负责执行细节）和 D 型（负责目标把控）搭档。与你沟通时，他人应先建立情感连接，再切入正题，避免过于冷硬的数据轰炸。',
+                insight: '"影响力不是说服，而是让人心甘情愿地跟随你的方向。" I 型的超能力在于让人感到被看见和被激励。当 I 型能够把这种热情引导到持续执行上，往往能创造出卓越的领导力叙事。',
+            },
+            S: {
+                title: '稳健型 — 可靠沉稳的支柱者',
+                desc:  '你是团队中最稳固的基石。你用耐心、一致性和真诚的关怀维系着团队的凝聚力。你不追求聚光灯，却是那个在危机时刻让所有人安心的存在。研究显示，S 型风格是四种风格中最常见的，在医疗、教育、客服和行政岗位高度集中。',
+                pros:  ['高度可靠，言出必行', '出色的倾听能力和共情力', '在压力下保持冷静和稳定', '长期主义，擅长维系持久关系'],
+                cons:  ['在需要快速变革时适应较慢', '过于回避冲突，可能压抑真实需求', '难以说"不"，容易过度承担', '在模糊和不确定的环境中容易焦虑'],
+                workplace: '你在需要持续性支持和协作的岗位上价值突出——项目协调、客户服务、医疗教育、团队运营。最适合与 D 型（提供方向驱动）和 I 型（带来活力变化）搭档。与你沟通时，他人应给予足够的时间，避免突然施压，先建立信任再提要求。',
+                insight: 'S 型的核心需求是安全感与归属感。Marston 将其描述为"在友好环境中的顺应与支持"。S 型最大的成长课题往往不是"做得更多"，而是"学会主动表达需求"——因为沉默的付出往往被低估。',
+            },
+            C: {
+                title: '谨慎型 — 精确严谨的分析者',
+                desc:  '你是品质与精确性的守护者。你对细节的关注和对标准的坚持，确保了工作的高水准输出。你不轻易下结论，因为你深知每一个决定背后都需要扎实的事实支撑。C 型风格在工程、财务、法律、科研和数据分析领域高度集中。',
+                pros:  ['极高的准确性与细节把控力', '系统性思维，善于分析复杂问题', '高标准、高质量的持续输出', '在高风险决策中能够提供关键的理性约束'],
+                cons:  ['分析瘫痪风险——过度追求完美导致行动迟缓', '在模糊情境下难以作出快速判断', '对批评高度敏感，对自我要求可能过严', '在人际互动中显得过于冷静甚至疏离'],
+                workplace: '你在需要高精度、高标准和复杂分析的岗位上无可取代——数据分析、研究开发、质量管理、财务审计、法律合规。最适合与 D 型（提供方向决策）和 I 型（推进人际落地）搭档。与你沟通时，他人应提前准备充分的数据和逻辑，给予足够时间，避免强迫立即表态。',
+                insight: '"完美是优秀的敌人"——这句话对 C 型而言有时格外真实。C 型的超能力是"看见别人看不见的风险"，但成长的关键在于学会在"足够好"与"极致完美"之间找到可操作的平衡点，让分析转化为行动。',
+            },
+        };
+
+        const styleReport = computed(() => reports[primaryStyle.value] || reports['S']);
+
+        // 保存为图片
+        async function saveAsImage() {
+            isSaving.value = true;
+            await nextTick();
+            try {
+                const el = document.querySelector('#app > main .bg-white')
+                         || document.querySelector('#app .bg-white');
+                const canvas = await html2canvas(el, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                });
+                const link = document.createElement('a');
+                link.download = 'DISC-report.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (e) {
+                alert('保存失败，请尝试手动截图。');
+            } finally {
+                isSaving.value = false;
+            }
+        }
+
+        return {
+            currentIndex, questions, options, dimLabel,
+            handleAnswer, prevQuestion,
+            isFinished, assessmentId,
+            dimBars, primaryStyle, secondaryStyle, styleNames, blendType,
+            styleReport, isSaving, saveAsImage,
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
