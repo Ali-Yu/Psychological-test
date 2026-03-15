@@ -68,42 +68,32 @@
                 <div class="progress-line mb-12">
                     <div class="progress-fill" :style="{ width: `${(currentIndex / questions.length) * 100}%` }"></div>
                 </div>
-                <div class="mb-12">
-                    <p class="text-xs text-gray-400 mb-4 tracking-tighter">— QUESTION {{ currentIndex + 1 }} / 16</p>
-                    <p class="text-xs text-gray-300 mb-6 tracking-wide">选择更符合你真实想法的一项</p>
-                    <div class="space-y-4">
-                        <div class="border border-gray-100 p-5 bg-white rounded-sm">
-                            <p class="text-xs text-gray-300 mb-2 tracking-widest">A</p>
-                            <h3 class="text-base md:text-lg leading-relaxed serif font-medium text-gray-800">
+                <div class="mb-8">
+                    <p class="text-xs text-gray-400 mb-8 tracking-tighter">— QUESTION {{ currentIndex + 1 }} / 16</p>
+                    <div class="space-y-3">
+                        <button
+                            @click="handleAnswer(questions[currentIndex].narcScore === 'a' ? 1 : 0)"
+                            class="option-btn w-full p-5 text-left bg-white border border-gray-100 rounded-sm hover:border-gray-400 hover:bg-gray-50 transition-all group"
+                        >
+                            <p class="text-xs text-gray-300 mb-2 tracking-widest group-hover:text-gray-400">A</p>
+                            <p class="text-base md:text-lg leading-relaxed serif font-medium text-gray-700 group-hover:text-gray-900">
                                 {{ questions[currentIndex].a }}
-                            </h3>
-                        </div>
-                        <div class="border border-gray-100 p-5 bg-white rounded-sm">
-                            <p class="text-xs text-gray-300 mb-2 tracking-widest">B</p>
-                            <h3 class="text-base md:text-lg leading-relaxed serif font-medium text-gray-800">
+                            </p>
+                        </button>
+                        <button
+                            @click="handleAnswer(questions[currentIndex].narcScore === 'b' ? 1 : 0)"
+                            class="option-btn w-full p-5 text-left bg-white border border-gray-100 rounded-sm hover:border-gray-400 hover:bg-gray-50 transition-all group"
+                        >
+                            <p class="text-xs text-gray-300 mb-2 tracking-widest group-hover:text-gray-400">B</p>
+                            <p class="text-base md:text-lg leading-relaxed serif font-medium text-gray-700 group-hover:text-gray-900">
                                 {{ questions[currentIndex].b }}
-                            </h3>
-                        </div>
+                            </p>
+                        </button>
                     </div>
                 </div>
-                <div class="space-y-1">
-                    <button
-                        @click="handleAnswer(questions[currentIndex].narcScore === 'a' ? 1 : 0)"
-                        class="option-btn w-full py-5 text-left flex justify-between items-center group"
-                    >
-                        <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">选 A ——&nbsp; {{ questions[currentIndex].a.slice(0,12) }}…</span>
-                    </button>
-                    <button
-                        @click="handleAnswer(questions[currentIndex].narcScore === 'b' ? 1 : 0)"
-                        class="option-btn w-full py-5 text-left flex justify-between items-center group"
-                    >
-                        <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">选 B ——&nbsp; {{ questions[currentIndex].b.slice(0,12) }}…</span>
-                    </button>
-                </div>
-                <div class="mt-16 flex justify-between items-center text-xs tracking-widest text-gray-300">
+                <div class="mt-12 flex justify-start items-center text-xs tracking-widest text-gray-300">
                     <button @click="prevQuestion" v-if="currentIndex > 0" class="hover:text-black transition-colors">BACK</button>
-                    <span v-else>START</span>
-                    <span>SCORE: {{ currentScore }} / {{ currentIndex }}</span>
+                    <span v-else>&nbsp;</span>
                 </div>
             </div>
 
