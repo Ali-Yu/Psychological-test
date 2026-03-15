@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISI 失眠严重程度指数测评报告</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+        body { font-family: 'Noto Sans SC', sans-serif; background-color: #f7f6f2; color: #333333; }
+        .serif { font-family: 'Noto Serif SC', serif; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.4s ease, transform 0.4s ease; }
+        .fade-enter-from { opacity: 0; transform: translateY(10px); }
+        .fade-leave-to   { opacity: 0; transform: translateY(-10px); }
+        .option-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .option-btn:hover { background-color: #fff; padding-left: 1.5rem; border-color: #333; }
+        [v-cloak] { display: none; }
+        .progress-line { height: 1px; background: #e5e5e5; }
+        .progress-fill { height: 1px; background: #333; transition: width 0.6s ease; }
+        .save-btn { transition: all 0.3s ease; }
+        .save-btn:hover { background: #333; color: #fff; }
+        .save-btn:active { transform: scale(0.97); }
+        .item-bar-track { height: 5px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
+        .item-bar-fill  { height: 5px; border-radius: 3px; transition: width 0.9s ease; }
+        .dim-tag { display: inline-block; font-size: 9px; letter-spacing: 0.05em; padding: 1px 6px; border-radius: 2px; }
+    </style>
+</head>
+<body class="antialiased">
+
+<script>
+(function () {
+    const p     = new URLSearchParams(location.search);
+    const token = p.get('token') || '';
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const parts = token.split('.');
+    if (parts.length !== 2 || parts[0] !== today) {
+        location.replace('index.html');
+    }
+})();
+</script>
+
+<div id="app" v-cloak class="max-w-xl mx-auto px-6 py-20">
+<transition name="fade" mode="out-in">
+
+    <!-- ── 免责声明页 ── -->
+    <div v-if="showDisclaimer" key="disclaimer" class="bg-white p-8 shadow-sm border border-gray-100">
+        <div class="mb-8 border-l-2 border-black pl-6">
+            <h1 class="text-2xl font-light tracking-widest serif">ISI</h1>
+            <h2 class="text-sm text-gray-400 mt-1 uppercase tracking-widest">Insomnia Severity Index</h2>
+        </div>
+        <div class="space-y-4 text-xs text-gray-500 leading-relaxed mb-8">
+            <p class="font-medium text-gray-700 text-sm">请在开始前阅读以下说明</p>
+            <p>ISI 是经过广泛验证的失眠严重程度<strong>筛查工具</strong>，帮助你评估当前睡眠问题的性质、严重程度及对日常功能的影响。</p>
+            <p class="bg-gray-50 p-4 rounded-sm text-gray-600">
+                ⚠️ <strong>重要提示：</strong>本测评结果<strong>不构成任何医学诊断</strong>。持续失眠可能与多种心理或躯体因素相关，建议在专业人员的指导下进行全面评估。
+            </p>
+            <p>以下7道题请根据你<strong>过去两周</strong>的实际睡眠状况如实作答。每题选项不同，请仔细阅读后再选择。</p>
+            <p>如果睡眠问题令你感到极度困扰，可以联系：</p>
+            <ul class="space-y-1 pl-4">
+                <li>· 全国心理援助热线：<strong>400-161-9995</strong></li>
+                <li>· 北京心理危机研究与干预中心：<strong>010-82951332</strong></li>
+            </ul>
+        </div>
+        <button @click="showDisclaimer = false"
+                class="w-full py-4 border border-gray-300 text-xs tracking-widest text-gray-600 hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all">
+            我已了解，开始测评 →
+        </button>
+    </div>
+
+    <!-- ── 答题页 ── -->
+    <div v-else-if="!isFinished" key="quiz">
+        <header class="mb-16 border-l-2 border-black pl-6">
+            <h1 class="text-2xl font-light tracking-widest serif">ISI</h1>
+            <h2 class="text-sm text-gray-400 mt-1 uppercase tracking-widest">Insomnia Severity Index</h2>
+        </header>
+
+        <transition name="fade" mode="out-in">
+        <div :key="currentIndex">
+            <div class="progress-line mb-12">
+                <div class="progress-fill" :style="{ width: `${(currentIndex / questions.length) * 100}%` }"></div>
+            </div>
+            <div class="mb-10">
+                <p class="text-xs text-gray-400 mb-2 tracking-tighter">— QUESTION {{ currentIndex + 1 }} / 7</p>
+                <p class="text-xs text-gray-300 mb-1 tracking-wide uppercase">{{ questions[currentIndex].dimLabel }}</p>
+                <p class="text-xs text-gray-300 mb-6 tracking-wide">{{ questions[currentIndex].timeframe }}</p>
+                <h3 class="text-xl md:text-2xl leading-relaxed serif font-medium text-gray-800">
+                    {{ questions[currentIndex].text }}
+                </h3>
+            </div>
+            <div class="space-y-1">
+                <button
+                    v-for="opt in questions[currentIndex].options" :key="opt.value"
+                    @click="handleAnswer(opt.value)"
+                    class="option-btn w-full py-4 text-left flex justify-between items-center group"
+                >
+                    <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">{{ opt.label }}</span>
+                    <span class="text-xs text-gray-200 group-hover:text-gray-400">{{ opt.value }}</span>
+                </button>
+            </div>
+            <div class="mt-16 flex justify-start items-center text-xs tracking-widest text-gray-300">
+                <button @click="prevQuestion" v-if="currentIndex > 0" class="hover:text-black transition-colors">BACK</button>
+                <span v-else>&nbsp;</span>
+            </div>
+        </div>
+        </transition>
+    </div>
+
+    <!-- ── 结果页 ── -->
+    <div v-else key="result" class="bg-white p-8 md:p-12 shadow-sm border border-gray-100">
+
+        <!-- 标题 -->
+        <div class="text-center mb-12">
+            <span class="text-xs tracking-[0.3em] text-gray-400 border-b border-gray-200 pb-2">测评报告书</span>
+            <h2 class="text-3xl serif mt-8 font-bold text-gray-900">失眠严重程度评估结果</h2>
+            <p class="text-sm text-gray-400 mt-2 italic">Assessment ID: {{ assessmentId }}</p>
+            <p class="text-xs text-gray-300 mt-1">评估时间窗：过去两周</p>
+        </div>
+
+        <!-- 分数 + 五色分段量尺 -->
+        <div class="mb-16">
+            <div class="flex items-end justify-between mb-6">
+                <div>
+                    <div class="text-xs text-gray-400 uppercase tracking-widest mb-2">Total Score</div>
+                    <div class="text-6xl serif font-light text-gray-900">{{ finalScore }}</div>
+                    <div class="text-[10px] text-gray-300 mt-1">Range: 0 – 28</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-gray-400 uppercase tracking-widest mb-2">Severity Level</div>
+                    <div class="text-lg serif font-medium text-gray-800">{{ interpretation.level }}</div>
+                    <div class="text-[10px] text-gray-400 mt-1">{{ interpretation.cutoff }}</div>
+                </div>
+            </div>
+
+            <!-- 四色分段量尺 -->
+            <div class="space-y-2 mb-8">
+                <div class="flex h-3 rounded-sm overflow-hidden gap-0.5">
+                    <div class="flex-[7] bg-gray-100 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-gray-400">0–7</div>
+                    </div>
+                    <div class="flex-[7] bg-gray-300 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-gray-600">8–14</div>
+                    </div>
+                    <div class="flex-[7] bg-gray-600 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-white">15–21</div>
+                    </div>
+                    <div class="flex-[7] bg-gray-900 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-white">22–28</div>
+                    </div>
+                </div>
+                <div class="relative h-2">
+                    <div class="absolute top-0 w-0.5 h-2 bg-black transition-all duration-700"
+                         :style="{ left: `calc(${Math.min(finalScore / 28 * 100, 97)}%)` }">
+                    </div>
+                </div>
+                <div class="flex justify-between text-[8px] text-gray-300">
+                    <span>无失眠</span><span>阈下失眠</span><span>中度失眠</span><span>重度失眠</span>
+                </div>
+            </div>
+
+            <!-- 三维度分项得分 -->
+            <div class="space-y-5 mt-8">
+                <div class="text-xs text-gray-400 uppercase tracking-widest mb-3">Dimension Breakdown</div>
+
+                <div v-for="dim in dimBreakdown" :key="dim.key" class="space-y-1.5">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-2">
+                            <span class="dim-tag bg-gray-100 text-gray-500">{{ dim.label }}</span>
+                            <span class="text-[10px] text-gray-400">{{ dim.desc }}</span>
+                        </div>
+                        <span class="text-[10px] text-gray-400">{{ dim.score }} / {{ dim.max }}</span>
+                    </div>
+                    <div class="item-bar-track">
+                        <div class="item-bar-fill"
+                             :style="{ width: (dim.score / dim.max * 100) + '%', background: dim.score / dim.max >= 0.6 ? '#333' : '#bbb' }">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 逐题明细 -->
+                <div class="mt-4 space-y-1.5">
+                    <div class="text-xs text-gray-400 uppercase tracking-widest mb-3">Item Detail</div>
+                    <div v-for="(q, i) in questions" :key="i" class="flex items-center gap-3">
+                        <span class="text-[9px] text-gray-300 w-4 flex-shrink-0">{{ i + 1 }}</span>
+                        <div class="flex-1 item-bar-track">
+                            <div class="item-bar-fill"
+                                 :style="{ width: (answers[i] / 4 * 100) + '%', background: answers[i] >= 3 ? '#333' : answers[i] >= 2 ? '#888' : '#ccc' }">
+                            </div>
+                        </div>
+                        <span class="text-[9px] text-gray-400 w-3 text-right flex-shrink-0">{{ answers[i] }}</span>
+                        <span class="text-[9px] text-gray-300 w-20 flex-shrink-0 truncate">{{ q.shortLabel }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="space-y-8 text-left border-t border-gray-100 pt-10">
+
+            <!-- 核心摘要 -->
+            <section>
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-4 uppercase">/ 核心摘要</h4>
+                <p class="text-lg serif leading-relaxed text-gray-800 mb-3">{{ interpretation.title }}</p>
+                <p class="text-sm leading-relaxed text-gray-500">{{ interpretation.desc }}</p>
+            </section>
+
+            <!-- 优势应对 / 建议行动 -->
+            <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 可能的维持因素</h4>
+                    <ul class="text-xs text-gray-600 space-y-2">
+                        <li v-for="f in interpretation.factors" class="flex items-start">
+                            <span class="w-1 h-1 bg-black mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ f }}
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 建议行动</h4>
+                    <ul class="text-xs text-gray-600 space-y-2">
+                        <li v-for="a in interpretation.actions" class="flex items-start">
+                            <span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ a }}
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- 失眠共病提示 -->
+            <section v-if="finalScore >= 10" class="bg-gray-50 border-l-2 border-gray-300 pl-4 py-4 pr-4">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-2 uppercase">/ 失眠与心理健康的关联</h4>
+                <p class="text-xs text-gray-500 leading-relaxed">
+                    大型中国青少年研究（N = 570,295）发现 ISI 与 PHQ-9 的相关系数 r = 0.72，提示失眠与抑郁高度共病（Wang et al., 2025）。失眠既可以是焦虑、抑郁的症状，也可以是它们的诱因——睡眠剥夺会显著提升负面情绪的反应性。如果你同时注意到情绪低落或焦虑感明显，建议在寻求专业帮助时一并提及。
+                </p>
+            </section>
+
+            <!-- 循证干预方法 -->
+            <section v-if="finalScore >= 8">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 循证干预方法</h4>
+                <ul class="text-xs text-gray-600 space-y-2">
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span><strong>认知行为治疗失眠（CBT-I）：</strong>现有最高证据等级的失眠干预，包括睡眠限制、刺激控制、认知重构三大核心成分，长期效果优于安眠药物（Trauer et al., 2015 Annals of Internal Medicine）</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span><strong>刺激控制：</strong>只在困意强烈时上床；床只用于睡眠，不用于刷手机、工作；20分钟睡不着就起床，直到有睡意再回来</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span><strong>固定起床时间：</strong>无论前一晚睡了多久，固定同一时间起床——这是重建昼夜节律最有效的单一行为</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span><strong>减少"努力入睡"：</strong>越努力入睡，大脑越警觉。尝试"矛盾意向"——刻意保持清醒（但放松躺着），反而更容易入睡</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span><strong>减少补偿行为：</strong>避免白天过度补觉、提早上床或延迟起床——这些行为会维持失眠的恶性循环</li>
+                </ul>
+            </section>
+
+            <!-- 深度解析 -->
+            <section class="bg-gray-50 p-6 rounded-sm">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 深度解析录</h4>
+                <p class="text-xs leading-loose text-gray-500 italic">"{{ interpretation.insight }}"</p>
+            </section>
+
+            <!-- 参考常模与研究背景 -->
+            <section class="border border-gray-100 p-5 rounded-sm">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 参考常模与研究背景</h4>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    ISI 由睡眠研究学者 Charles Morin 于 1993/1996 年开发，是全球最广泛使用的失眠自评工具之一，已被翻译为中文、意大利语、韩语、葡萄牙语、阿拉伯语、德语等十余种语言并完成心理测量验证。量表包含7个条目，分别评估<strong>失眠严重程度</strong>（入睡困难、维持睡眠、早醒）、<strong>睡眠满意度</strong>，以及失眠对<strong>日间功能的影响、他人的可察觉性和主观困扰程度</strong>，采用0–4五级计分，总分0–28分。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    <strong>信效度：</strong>可靠性泛化元分析（33项研究，N = 29,688，α范围 0.65–0.92）显示加权平均 Cronbach's α = 0.82（Cerri et al., 2023）；原版两项大样本研究（社区样本 N = 959，临床样本 N = 245）内部一致性均为 α = 0.90–0.91（Morin et al., 2011）。与匹兹堡睡眠质量指数（PSQI）相关 r = 0.80，效标效度良好。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    <strong>分段临界值：</strong>以半结构化临床访谈为金标准，社区样本中临界值10分具有最优判别性能（灵敏度 86.1%，特异度 87.7%）；临床样本推荐临界值15分用于识别中重度临床失眠（Morin et al., 2011）。治疗反应方面，总分变化 ≥8.4 分对应"中度改善"，≥9 分对应"显著改善"。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    <strong>人群分布与性别差异：</strong>中国青少年大规模研究（N = 570,295）显示女生均值 6.80（SD = 5.42），男生均值 6.15（SD = 5.19），效应量小（Cohen's d = 0.12）；住校生得分显著高于走读生（Wang et al., 2025）。普通成人社区研究中约 6–10% 的人得分≥15分，符合临床失眠标准。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed">
+                    <strong>重要局限：</strong>ISI 为主观自评量表，<em>不能替代客观睡眠监测</em>（多导睡眠监测 PSG）。量表不能区分原发性失眠与共病性失眠（如由抑郁、焦虑、睡眠呼吸暂停引起的失眠），若得分≥15分，强烈建议进行专业评估以排除其他睡眠障碍或躯体因素。本测评为研究教育用途，结果仅供参考，不构成任何诊断依据。
+                </p>
+            </section>
+
+            <!-- 专业资源 -->
+            <section class="border border-gray-200 p-5 rounded-sm">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 寻求帮助</h4>
+                <div class="text-xs text-gray-500 space-y-2">
+                    <p>如你的得分在中度及以上（≥15分），或失眠问题已持续超过3个月，建议寻求专业帮助：</p>
+                    <ul class="space-y-1.5 mt-2">
+                        <li>· <strong class="text-gray-700">睡眠专科门诊</strong>：大型综合医院神经科/精神科/睡眠科均可提供评估</li>
+                        <li>· <strong class="text-gray-700">CBT-I 心理咨询</strong>：简单心理、壹心理等平台可预约专项失眠咨询</li>
+                        <li>· <strong class="text-gray-700">全国心理援助热线</strong>：400-161-9995</li>
+                        <li>· <strong class="text-gray-700">数字 CBT-I</strong>：Sleepio（英文）等循证应用程序可作为辅助工具</li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+
+        <!-- 底部 -->
+        <div class="mt-16 pt-8 border-t border-gray-100 text-center">
+            <div class="text-[10px] text-gray-300 uppercase italic">Based on ISI · Morin (1993, 1996) · Bastien et al. (2001)</div>
+            <button
+                @click="saveAsImage"
+                :disabled="isSaving"
+                class="save-btn mt-6 px-6 py-3 border border-gray-300 text-xs tracking-widest text-gray-500 rounded-sm w-full"
+            >
+                <span v-if="!isSaving">📷 &nbsp;保存报告为图片</span>
+                <span v-else class="text-gray-300">生成中，请稍候…</span>
+            </button>
+            <p class="text-[10px] text-gray-300 mt-3">报告不会被储存，关闭页面后将无法找回</p>
+            <a href="index.html" class="mt-4 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
+                ← Return to Center
+            </a>
+        </div>
+
+    </div>
+
+</transition>
+</div>
+
+<script>
+const { createApp, ref, computed, nextTick } = Vue;
+
+createApp({
+    setup() {
+        const showDisclaimer = ref(true);
+        const currentIndex   = ref(0);
+        const answers        = ref([]);
+        const isFinished     = ref(false);
+        const assessmentId   = ref(Math.random().toString(36).substr(2, 9).toUpperCase());
+        const isSaving       = ref(false);
+
+        // ISI 标准7题，每题有独立选项
+        // 前3题：严重程度（0=无，1=轻微，2=中等，3=严重，4=极严重）
+        // 第4题：满意度（0=非常满意 → 4=非常不满意，反向）
+        // 第5-7题：影响/可见度/困扰（0=完全没有 → 4=极度）
+        const questions = [
+            {
+                text: '入睡困难（躺下后难以睡着）',
+                shortLabel: '入睡困难',
+                dimLabel: '严重程度 · Severity',
+                timeframe: '过去两周内，以下睡眠问题的严重程度',
+                dim: 'severity',
+                options: [
+                    { label: '无', value: 0 },
+                    { label: '轻微', value: 1 },
+                    { label: '中等', value: 2 },
+                    { label: '严重', value: 3 },
+                    { label: '极严重', value: 4 },
+                ]
+            },
+            {
+                text: '睡眠维持困难（夜间容易醒来）',
+                shortLabel: '难以维持睡眠',
+                dimLabel: '严重程度 · Severity',
+                timeframe: '过去两周内，以下睡眠问题的严重程度',
+                dim: 'severity',
+                options: [
+                    { label: '无', value: 0 },
+                    { label: '轻微', value: 1 },
+                    { label: '中等', value: 2 },
+                    { label: '严重', value: 3 },
+                    { label: '极严重', value: 4 },
+                ]
+            },
+            {
+                text: '早醒问题（比预期早醒且无法再入睡）',
+                shortLabel: '早醒',
+                dimLabel: '严重程度 · Severity',
+                timeframe: '过去两周内，以下睡眠问题的严重程度',
+                dim: 'severity',
+                options: [
+                    { label: '无', value: 0 },
+                    { label: '轻微', value: 1 },
+                    { label: '中等', value: 2 },
+                    { label: '严重', value: 3 },
+                    { label: '极严重', value: 4 },
+                ]
+            },
+            {
+                text: '你对目前睡眠状况的满意程度如何？',
+                shortLabel: '睡眠满意度',
+                dimLabel: '满意度 · Satisfaction',
+                timeframe: '请评估你目前整体的睡眠满意程度',
+                dim: 'satisfaction',
+                options: [
+                    { label: '非常满意', value: 0 },
+                    { label: '满意', value: 1 },
+                    { label: '一般', value: 2 },
+                    { label: '不满意', value: 3 },
+                    { label: '非常不满意', value: 4 },
+                ]
+            },
+            {
+                text: '你认为你的睡眠问题在多大程度上影响了你的日间功能（例如：白天疲劳、工作效率、注意力、记忆力、情绪等）？',
+                shortLabel: '日间功能影响',
+                dimLabel: '影响 · Impact',
+                timeframe: '过去两周内的实际感受',
+                dim: 'impact',
+                options: [
+                    { label: '完全没有影响', value: 0 },
+                    { label: '轻微影响', value: 1 },
+                    { label: '有些影响', value: 2 },
+                    { label: '较多影响', value: 3 },
+                    { label: '极大影响', value: 4 },
+                ]
+            },
+            {
+                text: '与你接触的人（如家人、同事、朋友）是否能察觉到你的睡眠问题对你生活质量造成了影响？',
+                shortLabel: '他人可察觉性',
+                dimLabel: '影响 · Impact',
+                timeframe: '你认为他人对此的察觉程度',
+                dim: 'impact',
+                options: [
+                    { label: '完全察觉不到', value: 0 },
+                    { label: '有点能察觉', value: 1 },
+                    { label: '有些能察觉', value: 2 },
+                    { label: '较明显', value: 3 },
+                    { label: '非常明显', value: 4 },
+                ]
+            },
+            {
+                text: '你对目前的睡眠问题感到多大程度的担忧或困扰？',
+                shortLabel: '主观困扰',
+                dimLabel: '困扰 · Distress',
+                timeframe: '过去两周内的主观感受',
+                dim: 'impact',
+                options: [
+                    { label: '完全不担忧', value: 0 },
+                    { label: '有一点担忧', value: 1 },
+                    { label: '有些担忧', value: 2 },
+                    { label: '比较担忧', value: 3 },
+                    { label: '非常担忧', value: 4 },
+                ]
+            },
+        ];
+
+        const handleAnswer = (val) => {
+            answers.value[currentIndex.value] = val;
+            if (currentIndex.value < questions.length - 1) {
+                currentIndex.value++;
+            } else {
+                isFinished.value = true;
+            }
+        };
+
+        const prevQuestion = () => { if (currentIndex.value > 0) currentIndex.value--; };
+
+        const finalScore = computed(() =>
+            answers.value.slice(0, 7).reduce((a, v) => a + (v || 0), 0)
+        );
+
+        // 三维度分组得分
+        const dimBreakdown = computed(() => {
+            const a = answers.value;
+            const severityScore     = (a[0] || 0) + (a[1] || 0) + (a[2] || 0);
+            const satisfactionScore = (a[3] || 0);
+            const impactScore       = (a[4] || 0) + (a[5] || 0) + (a[6] || 0);
+            return [
+                { key: 'severity',     label: '严重程度', desc: '入睡 / 维持 / 早醒',       score: severityScore,     max: 12 },
+                { key: 'satisfaction', label: '满意度',   desc: '对当前睡眠的主观评价',       score: satisfactionScore, max: 4  },
+                { key: 'impact',       label: '影响与困扰', desc: '日间功能 / 可见性 / 主观困扰', score: impactScore,       max: 12 },
+            ];
+        });
+
+        const interpretation = computed(() => {
+            const s = finalScore.value;
+
+            if (s >= 22) return {
+                level: '重度失眠',
+                cutoff: '22–28 分',
+                title: '症状严重——需要专业睡眠评估与干预',
+                desc: '你的得分处于重度失眠区间。这意味着失眠症状在过去两周内几乎每天发生，并对你的日间功能和主观感受造成了显著影响。重度失眠往往需要专业的睡眠评估——不仅要确认失眠的严重程度，还需排除可能的共病因素（如睡眠呼吸暂停、抑郁、焦虑等）。认知行为治疗失眠（CBT-I）和/或药物治疗的组合方案已被证明对重度失眠有效。',
+                factors: [
+                    '长期慢性应激或创伤经历',
+                    '对睡眠的过度担忧形成恶性循环（"睡眠焦虑"）',
+                    '可能共病焦虑、抑郁或其他睡眠障碍',
+                    '不良的睡眠卫生习惯长期积累',
+                ],
+                actions: [
+                    '尽快寻求睡眠专科门诊或心理健康专业人员评估',
+                    '询问医生是否适合 CBT-I 治疗',
+                    '如有情绪低落或焦虑，一并告知医生',
+                    '避免自行长期服用安眠药，需在医师指导下使用',
+                ],
+                insight: '重度失眠往往伴随着一种"我今晚一定睡不好"的预期焦虑——而这种焦虑本身就是维持失眠最强大的因素之一。CBT-I 的核心洞见是：失眠的维持不是因为你"睡不了"，而是因为你在错误的时间用错误的方式"努力睡"。打破这个循环，需要专业指导。',
+            };
+
+            if (s >= 15) return {
+                level: '中度失眠',
+                cutoff: '15–21 分',
+                title: '中度临床失眠——建议积极寻求干预',
+                desc: '你的得分达到临床显著失眠的标准（≥15分），提示你正在经历中度的睡眠障碍，且已对日间功能造成可察觉的影响。研究显示，这一程度的失眠如不加干预，有较高的慢性化风险。好消息是，CBT-I 对这一程度的失眠有极为显著的改善效果。',
+                factors: [
+                    '焦虑性思维在床上难以"关闭"',
+                    '不规律的睡眠时间表（周末补觉打乱节律）',
+                    '睡前使用电子设备（蓝光和内容刺激）',
+                    '压力事件或生活过渡期的触发',
+                ],
+                actions: [
+                    '考虑寻求 CBT-I 专项干预，这是中度失眠的首选治疗',
+                    '立即开始固定起床时间，即使周末也不例外',
+                    '将床与清醒状态解绑——睡不着时离开床',
+                    '减少对睡眠的监测行为（如反复看时间）',
+                ],
+                insight: '失眠的"睡眠努力悖论"：你越试图控制睡眠，大脑越会把床与唤醒状态关联。中度失眠往往是一个学习问题——睡眠系统没有问题，是睡眠相关的认知和行为出了问题。而这些是可以通过 CBT-I 重新学习的。',
+            };
+
+            if (s >= 8) return {
+                level: '阈下失眠',
+                cutoff: '8–14 分',
+                title: '亚临床失眠——值得认真对待的睡眠信号',
+                desc: '你的得分处于阈下（亚临床）失眠区间，提示睡眠存在一定程度的困扰，但尚未完全达到临床失眠的严重程度。阈下失眠是失眠慢性化的高风险前期——研究发现，这一区间的个体在一年内发展为临床失眠的概率约为正常睡眠者的三倍（Morin et al., 2009）。',
+                factors: [
+                    '睡前刷手机或过度思考工作',
+                    '睡眠时间不规律，周末大幅补觉',
+                    '日间压力未能有效释放',
+                    '轻度焦虑或情绪波动的影响',
+                ],
+                actions: [
+                    '建立固定睡眠时间窗（固定起床时间最为关键）',
+                    '睡前30分钟建立放松缓冲区，避免强刺激内容',
+                    '如担忧影响睡眠，尝试"担忧时间窗"技巧（在白天固定时段处理担忧）',
+                    '两周后重新测评，追踪变化趋势',
+                ],
+                insight: '阈下失眠最常见的维持机制是"越想睡好越睡不好"的补偿模式——提早上床、增加卧床时间、白天过度补觉。这些看似合理的补偿行为，实际上分散了睡眠驱动力，使夜间睡眠变得更加碎片化。',
+            };
+
+            return {
+                level: '无临床失眠',
+                cutoff: '0–7 分',
+                title: '睡眠状态良好——维持健康睡眠的意识',
+                desc: '你的得分提示目前没有明显的临床失眠症状。睡眠健康需要持续维护，了解失眠的早期信号和预防性睡眠卫生知识，有助于在压力时期保持良好的睡眠质量。',
+                factors: [
+                    '未来可能的生活压力或变化',
+                    '跨时区旅行或倒班工作',
+                    '重大生活事件引起的短暂失眠',
+                ],
+                actions: [
+                    '保持当前规律的睡眠节律',
+                    '了解失眠早期信号，避免过度应对（如提早上床、增加卧床时间）',
+                    '短期失眠（<3周）通常会自然恢复，避免过度担忧反而加重',
+                    '如未来出现持续睡眠问题，及时寻求帮助',
+                ],
+                insight: '好的睡眠不需要"努力"——它是身体的自然过程。睡眠健康的核心是建立稳定的昼夜节律、减少对睡眠的控制欲，以及不把偶尔的睡眠波动放大成威胁。你目前的状态是这种自然节律正常工作的结果。',
+            };
+        });
+
+        // 保存为图片
+        async function saveAsImage() {
+            isSaving.value = true;
+            await nextTick();
+            try {
+                const el = document.querySelector('#app > div.bg-white')
+                         || document.querySelector('#app .bg-white');
+                const canvas = await html2canvas(el, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                });
+                const link = document.createElement('a');
+                link.download = 'ISI-report.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (e) {
+                alert('保存失败，请尝试手动截图。');
+            } finally {
+                isSaving.value = false;
+            }
+        }
+
+        return {
+            showDisclaimer, currentIndex, questions,
+            handleAnswer, prevQuestion,
+            isFinished, finalScore, answers,
+            dimBreakdown, interpretation, assessmentId,
+            isSaving, saveAsImage,
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
