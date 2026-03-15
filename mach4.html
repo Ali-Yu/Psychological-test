@@ -83,10 +83,9 @@
                         <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">{{ option.label }}</span>
                     </button>
                 </div>
-                <div class="mt-16 flex justify-between items-center text-xs tracking-widest text-gray-300">
+                <div class="mt-16 flex justify-start items-center text-xs tracking-widest text-gray-300">
                     <button @click="prevQuestion" v-if="currentIndex > 0" class="hover:text-black transition-colors">BACK</button>
-                    <span v-else>START</span>
-                    <span>SCALED SCORE: {{ currentScore }}</span>
+                    <span v-else>&nbsp;</span>
                 </div>
             </div>
 
@@ -139,10 +138,26 @@
                         <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 深度解析录</h4>
                         <p class="text-xs leading-loose text-gray-500 italic">"{{ resultInterpretation.insight }}"</p>
                     </section>
+
+                    <section class="border border-gray-100 p-5 rounded-sm">
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 参考常模与研究背景</h4>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            Mach-IV 由 Christie & Geis（1970）基于 <strong>1,196 名大学生</strong>建立常模，理论中性分为 <strong>100 分</strong>（量表范围 40–160）。大量研究显示，普通人群均值约在 <strong>85–95 分</strong>区间，得分高于常模均值约 10 分以上方可归入"高马基"范畴。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            <strong>职业差异：</strong>研究发现管理者与法律从业者的得分显著高于均值，而社工、心理咨询等助人职业从业者的得分则处于较低区间（Fehr et al., 1992）。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            <strong>性别差异：</strong>跨文化研究持续发现男性得分系统性地高于女性，但效应量属中等，不代表绝对区分（Christie & Geis, 1970）。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed">
+                            <strong>暗三角关联：</strong>马基雅维利主义与自恋（Narcissism）、精神病态（Psychopathy）共同构成人格心理学中的"暗三角"（Dark Triad）。三者共享操纵性与共情缺陷的核心特征，但马基雅维利主义的独特性在于其<em>长期规划性</em>与<em>延迟满足倾向</em>（Paulhus & Williams, 2002）。
+                        </p>
+                    </section>
                 </div>
 
                 <div class="mt-16 pt-8 border-t border-gray-100 text-center">
-                    <div class="text-[10px] text-gray-300 uppercase italic">Authenticated by Mach-IV Standard System</div>
+                    <div class="text-[10px] text-gray-300 uppercase italic">Based on Mach-IV · Christie & Geis (1970)</div>
                     <p class="mt-6 text-xs text-gray-400 tracking-wide">📷 建议截图保存你的测评结果</p>
                     <p class="text-[10px] text-gray-300 mt-1">报告不会被储存，关闭页面后将无法找回</p>
                     <a href="index.html" class="mt-6 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
