@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BFI-S 大五人格测评报告</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+        body { font-family: 'Noto Sans SC', sans-serif; background-color: #f7f6f2; color: #333333; }
+        .serif { font-family: 'Noto Serif SC', serif; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.4s ease, transform 0.4s ease; }
+        .fade-enter-from { opacity: 0; transform: translateY(10px); }
+        .fade-leave-to   { opacity: 0; transform: translateY(-10px); }
+        .option-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .option-btn:hover { background-color: #fff; padding-left: 1.5rem; border-color: #333; }
+        [v-cloak] { display: none; }
+        .progress-line { height: 1px; background: #e5e5e5; }
+        .progress-fill { height: 1px; background: #333; transition: width 0.6s ease; }
+        .save-btn { transition: all 0.3s ease; }
+        .save-btn:hover { background: #333; color: #fff; }
+        .save-btn:active { transform: scale(0.97); }
+        .dim-bar-track { height: 6px; background: #f0f0f0; border-radius: 3px; position: relative; overflow: visible; }
+        .dim-bar-center { position: absolute; left: 50%; top: -2px; width: 1px; height: 10px; background: #ccc; }
+        .dim-bar-fill { height: 6px; border-radius: 3px; transition: width 0.8s ease, left 0.8s ease; position: absolute; top: 0; }
+    </style>
+</head>
+<body class="antialiased">
+
+<script>
+(function () {
+    const p     = new URLSearchParams(location.search);
+    const token = p.get('token') || '';
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const parts = token.split('.');
+    if (parts.length !== 2 || parts[0] !== today) {
+        location.replace('index.html');
+    }
+})();
+</script>
+
+<div id="app" v-cloak class="max-w-xl mx-auto px-6 py-20">
+
+    <!-- Header -->
+    <header v-if="!isFinished" class="mb-16 border-l-2 border-black pl-6">
+        <h1 class="text-2xl font-light tracking-widest serif">BFI-S</h1>
+        <h2 class="text-sm text-gray-400 mt-1 uppercase tracking-widest">Big Five Inventory · Short Form</h2>
+    </header>
+
+    <main>
+        <transition name="fade" mode="out-in">
+
+            <!-- 答题页 -->
+            <div v-if="!isFinished" :key="currentIndex">
+                <div class="progress-line mb-12">
+                    <div class="progress-fill" :style="{ width: `${(currentIndex / questions.length) * 100}%` }"></div>
+                </div>
+                <div class="mb-12">
+                    <p class="text-xs text-gray-400 mb-4 tracking-tighter">— QUESTION {{ currentIndex + 1 }} / 15</p>
+                    <p class="text-xs text-gray-300 mb-3 tracking-wide">我认为自己是一个…… 的人</p>
+                    <h3 class="text-xl md:text-2xl leading-relaxed serif font-medium text-gray-800">
+                        {{ questions[currentIndex].text }}
+                    </h3>
+                </div>
+                <div class="space-y-1">
+                    <button
+                        v-for="opt in options" :key="opt.value"
+                        @click="handleAnswer(opt.value)"
+                        class="option-btn w-full py-5 text-left flex justify-between items-center group"
+                    >
+                        <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">{{ opt.label }}</span>
+                    </button>
+                </div>
+                <div class="mt-16 flex justify-start items-center text-xs tracking-widest text-gray-300">
+                    <button @click="prevQuestion" v-if="currentIndex > 0" class="hover:text-black transition-colors">BACK</button>
+                    <span v-else>&nbsp;</span>
+                </div>
+            </div>
+
+            <!-- 结果页 -->
+            <div v-else key="result" class="bg-white p-8 md:p-12 shadow-sm border border-gray-100">
+
+                <div class="text-center mb-12">
+                    <span class="text-xs tracking-[0.3em] text-gray-400 border-b border-gray-200 pb-2">测评报告书</span>
+                    <h2 class="text-3xl serif mt-8 font-bold text-gray-900">大五人格特质分析</h2>
+                    <p class="text-sm text-gray-400 mt-2 italic">Assessment ID: {{ assessmentId }}</p>
+                </div>
+
+                <!-- 五维度双向条形图 -->
+                <div class="mb-16">
+                    <div class="text-xs text-gray-400 uppercase mb-6 text-center tracking-widest">Personality Profile</div>
+                    <div class="space-y-6">
+                        <div v-for="dim in dimBars" :key="dim.key">
+                            <div class="flex justify-between items-baseline mb-1.5">
+                                <span class="text-xs font-medium text-gray-700">{{ dim.label }}</span>
+                                <span class="text-[10px] text-gray-400">{{ dim.scoreLabel }}</span>
+                            </div>
+                            <!-- 双向条形 -->
+                            <div class="dim-bar-track">
+                                <div class="dim-bar-center"></div>
+                                <!-- 高分：从中心向右 -->
+                                <div v-if="dim.pct >= 50"
+                                     class="dim-bar-fill"
+                                     :style="{ left: '50%', width: ((dim.pct - 50) * 2) + '%', background: '#1a1a1a' }">
+                                </div>
+                                <!-- 低分：从中心向左 -->
+                                <div v-else
+                                     class="dim-bar-fill"
+                                     :style="{ left: (dim.pct * 2) + '%', width: ((50 - dim.pct) * 2) + '%', background: '#999' }">
+                                </div>
+                            </div>
+                            <div class="flex justify-between text-[9px] text-gray-300 mt-1">
+                                <span>低</span>
+                                <span v-if="dim.pct >= 50" class="text-gray-500">{{ dim.levelLabel }}</span>
+                                <span v-else class="text-gray-400">{{ dim.levelLabel }}</span>
+                                <span>高</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-[9px] text-gray-300 mt-4 text-center">中线为均值参考线，填充方向表示高低倾向，长度表示偏离程度</p>
+                </div>
+
+                <!-- 内容区 -->
+                <div class="space-y-10 text-left border-t border-gray-100 pt-10">
+
+                    <!-- 五个维度详情 -->
+                    <section>
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-5 uppercase">/ 五维度特质解读</h4>
+                        <div class="space-y-5">
+                            <div v-for="dim in dimBars" :key="dim.key + '_detail'" class="pb-5 border-b border-gray-50 last:border-0">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-sm serif font-medium text-gray-800">{{ dim.label }}</span>
+                                    <span class="text-[10px] px-2 py-0.5 rounded-full"
+                                          :class="dim.pct >= 65 ? 'bg-gray-900 text-white' : dim.pct >= 35 ? 'bg-gray-100 text-gray-600' : 'bg-gray-50 text-gray-400'">
+                                        {{ dim.pct >= 65 ? '偏高' : dim.pct >= 35 ? '中等' : '偏低' }}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-gray-500 leading-relaxed">{{ dimDescriptions[dim.key][dim.pct >= 65 ? 'high' : dim.pct >= 35 ? 'mid' : 'low'] }}</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 优势特质 / 潜在盲点 -->
+                    <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 优势特质</h4>
+                            <ul class="text-xs text-gray-600 space-y-2">
+                                <li v-for="p in profileResult.pros" class="flex items-start">
+                                    <span class="w-1 h-1 bg-black mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ p }}
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 潜在盲点</h4>
+                            <ul class="text-xs text-gray-600 space-y-2">
+                                <li v-for="c in profileResult.cons" class="flex items-start">
+                                    <span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ c }}
+                                </li>
+                            </ul>
+                        </div>
+                    </section>
+
+                    <!-- 深度解析 -->
+                    <section class="bg-gray-50 p-6 rounded-sm">
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 深度解析录</h4>
+                        <p class="text-xs leading-loose text-gray-500 italic">"{{ profileResult.insight }}"</p>
+                    </section>
+
+                    <!-- 参考常模与研究背景 -->
+                    <section class="border border-gray-100 p-5 rounded-sm">
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 参考常模与研究背景</h4>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            BFI-S 由 Gerlitz & Schupp（2005）为德国社会经济专家研究组（GSOEP）开发，是 44 题 BFI 量表的精简版。<strong>每个大五维度各含 3 题，共 15 题</strong>，采用 7 点李克特量表（1=完全不同意，7=完全同意）。迄今已被逾 2000 项研究引用，覆盖德国、英国等大型追踪队列数据。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            <strong>信效度数据：</strong>内部一致性系数 α = 0.61–0.86，各维度 4 周重测信度 r = 0.74–0.84（Lang et al., 2011）。与完整 BFI-44 的聚合效度为 85–90%，与 NEO-PI-R 的区分效度在四个维度上表现良好，宜人性维度相对偏低（Hahn et al., 2012）。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            <strong>GSOEP 常模（自填条件，成人样本）：</strong>外倾性 M ≈ 4.9，宜人性 M ≈ 5.5，尽责性 M ≈ 5.6，神经质 M ≈ 3.7，开放性 M ≈ 5.1（7分制）。得分在均值 ±1 SD 内属常见范围。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                            <strong>文化与性别差异：</strong>跨文化研究显示女性在神经质与宜人性维度上平均得分普遍高于男性；集体主义文化背景下宜人性和尽责性得分通常偏高（Schmitt et al., 2008）。
+                        </p>
+                        <p class="text-xs text-gray-500 leading-relaxed">
+                            <strong>使用建议：</strong>BFI-S 适用于大规模调研、纵向研究及人格作为控制变量的场景。<em>不建议</em>用于个体临床诊断或需要分析亚维度特质的情境。本测评为研究教育用途，结果仅供参考，不构成任何诊断依据。
+                        </p>
+                    </section>
+                </div>
+
+                <!-- 底部 -->
+                <div class="mt-16 pt-8 border-t border-gray-100 text-center">
+                    <div class="text-[10px] text-gray-300 uppercase italic">Based on BFI-S · Gerlitz &amp; Schupp (2005) · Lang et al. (2011)</div>
+                    <button
+                        @click="saveAsImage"
+                        :disabled="isSaving"
+                        class="save-btn mt-6 px-6 py-3 border border-gray-300 text-xs tracking-widest text-gray-500 rounded-sm w-full"
+                    >
+                        <span v-if="!isSaving">📷 &nbsp;保存报告为图片</span>
+                        <span v-else class="text-gray-300">生成中，请稍候…</span>
+                    </button>
+                    <p class="text-[10px] text-gray-300 mt-3">报告不会被储存，关闭页面后将无法找回</p>
+                    <a href="index.html" class="mt-4 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
+                        ← Return to Center
+                    </a>
+                </div>
+
+            </div>
+        </transition>
+    </main>
+</div>
+
+<script>
+const { createApp, ref, computed, nextTick } = Vue;
+
+createApp({
+    setup() {
+        const currentIndex = ref(0);
+        const answers = ref([]);
+        const isFinished = ref(false);
+        const assessmentId = ref(Math.random().toString(36).substr(2, 9).toUpperCase());
+        const isSaving = ref(false);
+
+        // 7点量表选项
+        const options = [
+            { label: '完全不同意', value: 1 },
+            { label: '不同意',     value: 2 },
+            { label: '有些不同意', value: 3 },
+            { label: '中立',       value: 4 },
+            { label: '有些同意',   value: 5 },
+            { label: '同意',       value: 6 },
+            { label: '完全同意',   value: 7 },
+        ];
+
+        // BFI-S 标准15题（Lang et al., 2011；Gerlitz & Schupp, 2005）
+        // dim: N=神经质 E=外倾性 O=开放性 A=宜人性 C=尽责性
+        // reverse: true = 计分时用 8 - val
+        const questions = [
+            // 神经质 Neuroticism（题1、2、3）
+            { text: '容易担忧很多事情',            dim: 'N', reverse: false },
+            { text: '容易紧张，情绪波动较大',      dim: 'N', reverse: false },
+            { text: '在紧张情境下能保持冷静',      dim: 'N', reverse: true  },
+            // 外倾性 Extraversion（题4、5、6）
+            { text: '健谈，喜欢与人交谈',          dim: 'E', reverse: false },
+            { text: '外向，善于社交',              dim: 'E', reverse: false },
+            { text: '倾向保持低调，不爱抛头露面',  dim: 'E', reverse: true  },
+            // 开放性 Openness（题7、8、9）
+            { text: '富有原创性，常产生新想法',    dim: 'O', reverse: false },
+            { text: '重视艺术与审美体验',          dim: 'O', reverse: false },
+            { text: '想象力丰富，有活跃的内心世界',dim: 'O', reverse: false },
+            // 宜人性 Agreeableness（题10、11、12）
+            { text: '有时对他人态度粗鲁',          dim: 'A', reverse: true  },
+            { text: '有宽容心，能原谅他人',        dim: 'A', reverse: false },
+            { text: '体贴他人，乐于助人',          dim: 'A', reverse: false },
+            // 尽责性 Conscientiousness（题13、14、15）
+            { text: '做事认真仔细，有始有终',      dim: 'C', reverse: false },
+            { text: '有时会比较懒散',              dim: 'C', reverse: true  },
+            { text: '做事高效，能妥善完成任务',    dim: 'C', reverse: false },
+        ];
+
+        const handleAnswer = (val) => {
+            answers.value[currentIndex.value] = val;
+            if (currentIndex.value < questions.length - 1) {
+                currentIndex.value++;
+            } else {
+                isFinished.value = true;
+            }
+        };
+
+        const prevQuestion = () => { if (currentIndex.value > 0) currentIndex.value--; };
+
+        // 计算五维度均值（1–7分）
+        const dimScores = computed(() => {
+            const sums = { N: 0, E: 0, O: 0, A: 0, C: 0 };
+            const counts = { N: 0, E: 0, O: 0, A: 0, C: 0 };
+            answers.value.forEach((val, i) => {
+                if (i >= questions.length) return;
+                const q = questions[i];
+                const score = q.reverse ? (8 - val) : val;
+                sums[q.dim] += score;
+                counts[q.dim]++;
+            });
+            const result = {};
+            ['N','E','O','A','C'].forEach(d => {
+                result[d] = counts[d] > 0 ? sums[d] / counts[d] : 4;
+            });
+            return result;
+        });
+
+        // 转换为百分比（1–7 → 0–100%）用于可视化
+        const dimBars = computed(() => {
+            const s = dimScores.value;
+            const dimInfo = [
+                { key: 'N', label: '神经质  Neuroticism' },
+                { key: 'E', label: '外倾性  Extraversion' },
+                { key: 'O', label: '开放性  Openness' },
+                { key: 'A', label: '宜人性  Agreeableness' },
+                { key: 'C', label: '尽责性  Conscientiousness' },
+            ];
+            return dimInfo.map(d => {
+                const raw = s[d.key];
+                const pct = Math.round(((raw - 1) / 6) * 100);
+                const level = pct >= 65 ? '偏高' : pct >= 35 ? '中等' : '偏低';
+                return {
+                    ...d,
+                    raw: raw.toFixed(1),
+                    pct,
+                    levelLabel: level,
+                    scoreLabel: `${raw.toFixed(1)} / 7.0`,
+                };
+            });
+        });
+
+        // 各维度高/中/低描述
+        const dimDescriptions = {
+            N: {
+                high: '你对负面情绪的感知较为敏锐，容易体验到焦虑、担忧或情绪波动。这种高度的情绪感受性使你能细腻觉察潜在风险，但也可能带来更多内耗。',
+                mid:  '你在情绪稳定性上处于均衡状态，能在大多数情境下保持适度镇定，偶尔也会受到压力影响，属于常见的健康心理配置。',
+                low:  '你具有较强的情绪稳定性，面对压力和挫折时往往能保持冷静。这种特质与较高的心理韧性相关，在高压环境中是显著的竞争优势。',
+            },
+            E: {
+                high: '你从社交互动中获取能量，天然地外向、活跃。你喜欢成为群体中的活跃者，拥有较强的言语流畅性和社交吸引力，在需要人际影响力的场景中表现突出。',
+                mid:  '你在内外向之间保持灵活，能适应独处与社交不同情境。这种灵活性使你既能享受热闹，也能安于独处，社交弹性较强。',
+                low:  '你更倾向于从独处和小圈子中获取能量，社交活动可能令你感到消耗。这与更深入的专注力和独立思考能力相关，而非性格缺陷。',
+            },
+            O: {
+                high: '你对新体验和抽象概念有强烈的好奇心，富有创造力和审美敏感性。你倾向于打破常规思维，是创新和跨领域连接的天然推动者。',
+                mid:  '你在传统经验与新奇探索之间保持适度平衡，能欣赏创意也能脚踏实地，属于务实与好奇心兼备的人格配置。',
+                low:  '你更偏好具体、熟悉和实际的事物，对于过于抽象或理论性的内容兴趣有限。这种特质往往与高度的实操性和注重细节的执行力相关。',
+            },
+            A: {
+                high: '你天然具有合作倾向，对他人富有同理心与信任感。你更倾向于在冲突中寻求和解，是团队中重要的情感黏合剂和关系维护者。',
+                mid:  '你在合作与自我主张之间保持均衡，既能关心他人，也能在必要时坚守个人立场，具有健康的边界感。',
+                low:  '你更倾向于直接表达意见，竞争意识较强，不轻易妥协。这种特质在谈判和竞争性环境中是优势，但可能需要注意人际摩擦的管理。',
+            },
+            C: {
+                high: '你具有强烈的目标导向和自律性，做事有条理、负责任、高效率。研究一致表明，高尽责性与职业成就和长期健康呈正相关。',
+                mid:  '你在计划性和灵活性之间保持适度平衡，能完成任务也不会过度拘谨于规则，属于适应性强的执行风格。',
+                low:  '你偏向随兴而为，不拘于计划和规则，具有较强的灵活性和自发性。这与创造性工作风格相关，但在需要持续执行的任务中可能需要额外的结构支持。',
+            },
+        };
+
+        // 综合人格解读（基于最高维度组合）
+        const profileResult = computed(() => {
+            const s = dimScores.value;
+            const isHighN = s.N > 4.5;
+            const isHighE = s.E > 4.5;
+            const isHighO = s.O > 4.5;
+            const isHighA = s.A > 4.5;
+            const isHighC = s.C > 4.5;
+
+            // 找出最突出的两个维度
+            const dims = [
+                { key: 'N', val: s.N, name: '神经质' },
+                { key: 'E', val: s.E, name: '外倾性' },
+                { key: 'O', val: s.O, name: '开放性' },
+                { key: 'A', val: s.A, name: '宜人性' },
+                { key: 'C', val: s.C, name: '尽责性' },
+            ].sort((a, b) => b.val - a.val);
+
+            const top = dims[0].key;
+            const second = dims[1].key;
+
+            const profiles = {
+                'E_O': {
+                    pros: ['强大的创意输出与表达能力', '善于激励和感染他人', '灵活应变，乐于探索未知'],
+                    cons: ['可能在细节执行上缺乏耐心', '过于分散注意力在新事物上', '深度专注力有时不足'],
+                    insight: '你是充满热情的探索者，世界在你眼中永远有新的可能。Big Five 研究发现，外倾性与开放性的组合在创意行业和领导力培养上预测力最强（McCrae & Costa, 2003）。核心挑战是：将想法落地，而不是停在激情阶段。',
+                },
+                'E_C': {
+                    pros: ['出色的执行力与目标导向', '擅长调动资源推进项目', '在团队中兼具感召力与可靠性'],
+                    cons: ['对他人的效率期待可能过高', '高强度驱动下容易忽略休息', '有时在推进目标中忽视情感需求'],
+                    insight: '你是行动力极强的实干者。研究显示，外倾性+尽责性高分者在管理职位和创业领域均表现出显著的绩效优势（Judge et al., 2002）。注意在高速推进中留出自我审视的空间。',
+                },
+                'E_A': {
+                    pros: ['天然的人际吸引力与感召力', '富有同理心，善于建立深度连接', '在团队与社群中促进凝聚力'],
+                    cons: ['边界设定可能不足，容易被消耗', '过度关注他人需求而忽视自身', '在冲突中倾向回避而非直面'],
+                    insight: '你是天生的连接者，世界因你而更温暖。外倾性与宜人性的结合在服务型和教育型职业中预测力最强（Barrick & Mount, 1991）。学会设定边界，是让你的能量长久流动的关键。',
+                },
+                'C_A': {
+                    pros: ['高度可靠，信守承诺', '在团队中是稳定的情感与执行支柱', '细腻体察他人需求并付诸行动'],
+                    cons: ['在极端竞争环境中可能过于迁就', '完美主义倾向可能带来压力', '过度承担他人责任'],
+                    insight: '你是支柱型人格的典型。尽责性与宜人性的双高组合与职业稳定性和人际满意度高度相关（Roberts et al., 2007）。你的价值不需要通过不断付出来证明——学会接受，与付出同样重要。',
+                },
+                'O_C': {
+                    pros: ['兼具创新视野与执行落地能力', '善于将抽象概念转化为具体方案', '高度自律的同时保持对新知的好奇'],
+                    cons: ['可能对他人的效率和思维深度期待偏高', '在追求完美的同时有时抵制妥协', '切换灵感模式和执行模式时可能有内耗'],
+                    insight: '开放性与尽责性的结合是研究领域和战略规划领域最理想的人格配置之一。你既能看见图景，又能绘制路径——但记得让自己偶尔停下来享受过程，而不只是看结果。',
+                },
+                'N_default': {
+                    pros: ['高度的情绪感知与共情能力', '对潜在风险有细腻的感知', '在创作和反思性工作中深度投入'],
+                    cons: ['情绪波动可能影响决策稳定性', '自我批评倾向较强', '在高压环境下需要更多恢复期'],
+                    insight: '神经质得分偏高并不意味着脆弱——研究显示，它与创造力、共情能力和风险感知呈正相关（Nettle, 2006）。关键在于建立情绪调节的工具箱，而非消除感受本身。',
+                },
+                'default': {
+                    pros: ['人格配置均衡，适应力强', '在不同情境中能灵活调整应对策略', '兼具理性与感性的稳定基础'],
+                    cons: ['在需要鲜明个性的竞争场景中可能显得不够突出', '优势维度不够集中时难以形成显著差异化'],
+                    insight: '均衡的大五人格配置在心理韧性和生活满意度研究中表现稳定（Soto, 2019）。你的优势在于不受单一特质驱动，这在需要综合判断力的场景中是难得的资产。',
+                },
+            };
+
+            let key = `${top}_${second}`;
+            if (!profiles[key]) key = `${second}_${top}`;
+            if (!profiles[key]) key = isHighN ? 'N_default' : 'default';
+
+            return profiles[key] || profiles['default'];
+        });
+
+        // 保存为图片
+        async function saveAsImage() {
+            isSaving.value = true;
+            await nextTick();
+            try {
+                const el = document.querySelector('#app > main .bg-white')
+                         || document.querySelector('#app .bg-white');
+                const canvas = await html2canvas(el, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                });
+                const link = document.createElement('a');
+                link.download = 'BFI-S-report.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (e) {
+                alert('保存失败，请尝试手动截图。');
+            } finally {
+                isSaving.value = false;
+            }
+        }
+
+        return {
+            currentIndex, questions, options,
+            handleAnswer, prevQuestion,
+            isFinished, assessmentId,
+            dimBars, dimDescriptions, profileResult,
+            isSaving, saveAsImage,
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
