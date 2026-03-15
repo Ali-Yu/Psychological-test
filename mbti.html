@@ -78,41 +78,108 @@
                 <p class="text-sm text-gray-400 mt-2">人格倾向分析报告</p>
             </div>
 
-            <div class="flex flex-col md:flex-row items-center justify-around mb-16 gap-10">
-                <div class="text-center">
-                    <div class="text-xs text-gray-400 uppercase mb-3">Dimension Score</div>
-                    <div class="space-y-2 text-sm text-gray-600">
-                        <div class="flex items-center gap-3">
-                            <span class="w-16 text-right text-xs text-gray-400">E / I</span>
-                            <div class="w-32 h-1 bg-gray-100 rounded">
-                                <div class="h-1 bg-gray-700 rounded" :style="{ width: percent.E + '%' }"></div>
-                            </div>
-                            <span class="text-xs text-gray-400">{{ percent.E }}%</span>
+            <!-- 双向维度可视化 -->
+            <div class="mb-16 px-2">
+                <div class="text-xs text-gray-400 uppercase mb-6 text-center tracking-widest">Dimension Profile</div>
+                <div class="space-y-5">
+
+                    <!-- E / I -->
+                    <div>
+                        <div class="flex justify-between text-[10px] text-gray-400 mb-1.5">
+                            <span :class="percent.E >= 50 ? 'text-gray-800 font-medium' : ''">E 外向</span>
+                            <span :class="percent.E < 50 ? 'text-gray-800 font-medium' : ''">内向 I</span>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="w-16 text-right text-xs text-gray-400">S / N</span>
-                            <div class="w-32 h-1 bg-gray-100 rounded">
-                                <div class="h-1 bg-gray-700 rounded" :style="{ width: percent.S + '%' }"></div>
-                            </div>
-                            <span class="text-xs text-gray-400">{{ percent.S }}%</span>
+                        <div class="relative h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <!-- 中线 -->
+                            <div class="absolute left-1/2 top-0 w-px h-full bg-gray-300 z-10"></div>
+                            <!-- 左侧填充（E倾向） -->
+                            <div v-if="percent.E >= 50"
+                                 class="absolute left-1/2 top-0 h-full bg-gray-700 rounded-r-full transition-all duration-700"
+                                 :style="{ width: ((percent.E - 50) * 2) + '%' }"></div>
+                            <!-- 右侧填充（I倾向） -->
+                            <div v-else
+                                 class="absolute top-0 h-full bg-gray-500 rounded-l-full transition-all duration-700"
+                                 :style="{ right: 0, width: ((50 - percent.E) * 2) + '%' }"></div>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="w-16 text-right text-xs text-gray-400">T / F</span>
-                            <div class="w-32 h-1 bg-gray-100 rounded">
-                                <div class="h-1 bg-gray-700 rounded" :style="{ width: percent.T + '%' }"></div>
-                            </div>
-                            <span class="text-xs text-gray-400">{{ percent.T }}%</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="w-16 text-right text-xs text-gray-400">J / P</span>
-                            <div class="w-32 h-1 bg-gray-100 rounded">
-                                <div class="h-1 bg-gray-700 rounded" :style="{ width: percent.J + '%' }"></div>
-                            </div>
-                            <span class="text-xs text-gray-400">{{ percent.J }}%</span>
+                        <div class="flex justify-between text-[9px] text-gray-300 mt-1">
+                            <span v-if="percent.E >= 50">{{ (percent.E - 50) * 2 }}% 偏向 E</span>
+                            <span v-else>&nbsp;</span>
+                            <span v-if="percent.E < 50">{{ (50 - percent.E) * 2 }}% 偏向 I</span>
+                            <span v-else>&nbsp;</span>
                         </div>
                     </div>
+
+                    <!-- S / N -->
+                    <div>
+                        <div class="flex justify-between text-[10px] text-gray-400 mb-1.5">
+                            <span :class="percent.S >= 50 ? 'text-gray-800 font-medium' : ''">S 实感</span>
+                            <span :class="percent.S < 50 ? 'text-gray-800 font-medium' : ''">直觉 N</span>
+                        </div>
+                        <div class="relative h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="absolute left-1/2 top-0 w-px h-full bg-gray-300 z-10"></div>
+                            <div v-if="percent.S >= 50"
+                                 class="absolute left-1/2 top-0 h-full bg-gray-700 rounded-r-full transition-all duration-700"
+                                 :style="{ width: ((percent.S - 50) * 2) + '%' }"></div>
+                            <div v-else
+                                 class="absolute top-0 h-full bg-gray-500 rounded-l-full transition-all duration-700"
+                                 :style="{ right: 0, width: ((50 - percent.S) * 2) + '%' }"></div>
+                        </div>
+                        <div class="flex justify-between text-[9px] text-gray-300 mt-1">
+                            <span v-if="percent.S >= 50">{{ (percent.S - 50) * 2 }}% 偏向 S</span>
+                            <span v-else>&nbsp;</span>
+                            <span v-if="percent.S < 50">{{ (50 - percent.S) * 2 }}% 偏向 N</span>
+                            <span v-else>&nbsp;</span>
+                        </div>
+                    </div>
+
+                    <!-- T / F -->
+                    <div>
+                        <div class="flex justify-between text-[10px] text-gray-400 mb-1.5">
+                            <span :class="percent.T >= 50 ? 'text-gray-800 font-medium' : ''">T 思考</span>
+                            <span :class="percent.T < 50 ? 'text-gray-800 font-medium' : ''">情感 F</span>
+                        </div>
+                        <div class="relative h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="absolute left-1/2 top-0 w-px h-full bg-gray-300 z-10"></div>
+                            <div v-if="percent.T >= 50"
+                                 class="absolute left-1/2 top-0 h-full bg-gray-700 rounded-r-full transition-all duration-700"
+                                 :style="{ width: ((percent.T - 50) * 2) + '%' }"></div>
+                            <div v-else
+                                 class="absolute top-0 h-full bg-gray-500 rounded-l-full transition-all duration-700"
+                                 :style="{ right: 0, width: ((50 - percent.T) * 2) + '%' }"></div>
+                        </div>
+                        <div class="flex justify-between text-[9px] text-gray-300 mt-1">
+                            <span v-if="percent.T >= 50">{{ (percent.T - 50) * 2 }}% 偏向 T</span>
+                            <span v-else>&nbsp;</span>
+                            <span v-if="percent.T < 50">{{ (50 - percent.T) * 2 }}% 偏向 F</span>
+                            <span v-else>&nbsp;</span>
+                        </div>
+                    </div>
+
+                    <!-- J / P -->
+                    <div>
+                        <div class="flex justify-between text-[10px] text-gray-400 mb-1.5">
+                            <span :class="percent.J >= 50 ? 'text-gray-800 font-medium' : ''">J 判断</span>
+                            <span :class="percent.J < 50 ? 'text-gray-800 font-medium' : ''">感知 P</span>
+                        </div>
+                        <div class="relative h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="absolute left-1/2 top-0 w-px h-full bg-gray-300 z-10"></div>
+                            <div v-if="percent.J >= 50"
+                                 class="absolute left-1/2 top-0 h-full bg-gray-700 rounded-r-full transition-all duration-700"
+                                 :style="{ width: ((percent.J - 50) * 2) + '%' }"></div>
+                            <div v-else
+                                 class="absolute top-0 h-full bg-gray-500 rounded-l-full transition-all duration-700"
+                                 :style="{ right: 0, width: ((50 - percent.J) * 2) + '%' }"></div>
+                        </div>
+                        <div class="flex justify-between text-[9px] text-gray-300 mt-1">
+                            <span v-if="percent.J >= 50">{{ (percent.J - 50) * 2 }}% 偏向 J</span>
+                            <span v-else>&nbsp;</span>
+                            <span v-if="percent.J < 50">{{ (50 - percent.J) * 2 }}% 偏向 P</span>
+                            <span v-else>&nbsp;</span>
+                        </div>
+                    </div>
+
                 </div>
-                <div class="w-56 h-56"><canvas id="radar"></canvas></div>
+                <p class="text-[9px] text-gray-300 mt-4 text-center">中线为50%分界，填充方向即为你的倾向维度，长度代表倾向强度</p>
             </div>
 
             <div class="space-y-10 text-left border-t pt-10">
@@ -240,7 +307,7 @@ createApp({
                 index.value++;
             } else {
                 finished.value = true;
-                nextTick(() => renderChart());
+                // chart removed
             }
         }
 
@@ -307,38 +374,7 @@ createApp({
             };
         });
 
-        let chart = null;
-        function renderChart() {
-            const ctx = document.getElementById('radar');
-            if (!ctx) return;
-            if (chart) chart.destroy();
-            chart = new Chart(ctx, {
-                type: 'radar',
-                data: {
-                    labels: ['E', 'S', 'T', 'J'],
-                    datasets: [{
-                        data: [ percent.value.E, percent.value.S, percent.value.T, percent.value.J ],
-                        backgroundColor: 'rgba(0,0,0,0.05)',
-                        borderColor: '#333',
-                        borderWidth: 1,
-                        pointRadius: 2,
-                        pointBackgroundColor: '#333'
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        r: {
-                            min: 0, max: 100,
-                            ticks: { display: false },
-                            grid: { color: '#f0f0f0' },
-                            angleLines: { color: '#f0f0f0' },
-                            pointLabels: { font: { size: 11, family: 'Noto Sans SC' } }
-                        }
-                    }
-                }
-            });
-        }
+// renderChart removed
 
         function back() { if (index.value > 0) index.value--; }
         return { questions, index, options, answer, back, finished, totalAnswered, percent, resultType, report };
