@@ -1,423 +1,394 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NPI-16 自恋人格测评</title>
-
-<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-body{font-family:'Noto Sans SC',sans-serif;background:#f7f6f2;color:#333}
-.serif{font-family:'Noto Serif SC',serif}
-
-.fade-enter-active,.fade-leave-active{
-transition:opacity .4s,transform .4s
-}
-
-.fade-enter-from{opacity:0;transform:translateY(10px)}
-.fade-leave-to{opacity:0;transform:translateY(-10px)}
-
-.option-btn{
-transition:.3s;
-border-bottom:1px solid #e5e5e5
-}
-
-.option-btn:hover{
-background:#fff;
-padding-left:1.5rem;
-border-color:#333
-}
-
-.progress-line{height:1px;background:#e5e5e5}
-.progress-fill{height:1px;background:#333;transition:.6s}
-
-[v-cloak]{display:none}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NPI-16 自恋人格测评报告</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f7f6f2;
+            color: #333333;
+        }
+        .serif { font-family: 'Noto Serif SC', serif; }
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .fade-enter-from { opacity: 0; transform: translateY(10px); }
+        .fade-leave-to   { opacity: 0; transform: translateY(-10px); }
+        .option-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .option-btn:hover {
+            background-color: #fff;
+            padding-left: 1.5rem;
+            border-color: #333;
+        }
+        [v-cloak] { display: none; }
+        .progress-line { height: 1px; background: #e5e5e5; position: relative; }
+        .progress-fill { height: 1px; background: #333; transition: width 0.6s ease; }
+        .score-bar-track { height: 4px; background: #f0f0f0; border-radius: 2px; }
+        .score-bar-fill  { height: 4px; border-radius: 2px; transition: width 1s ease; }
+    </style>
 </head>
-
 <body class="antialiased">
+
+<!-- Token 验证：校验由 Cloudflare Function 签发的 token -->
+<script>
+(function () {
+    const p     = new URLSearchParams(location.search);
+    const token = p.get('token') || '';
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const parts = token.split('.');
+    if (parts.length !== 2 || parts[0] !== today) {
+        location.replace('index.html');
+    }
+})();
+</script>
 
 <div id="app" v-cloak class="max-w-xl mx-auto px-6 py-20">
 
-<header v-if="!finished" class="mb-16 border-l-2 border-black pl-6">
-<h1 class="text-2xl serif tracking-widest">NPI-16</h1>
-<h2 class="text-sm text-gray-400 uppercase tracking-widest mt-1">
-Narcissistic Personality Inventory
-</h2>
-</header>
+    <!-- Header -->
+    <header v-if="!isFinished" class="mb-16 border-l-2 border-black pl-6">
+        <h1 class="text-2xl font-light tracking-widest serif">NPI-16</h1>
+        <h2 class="text-sm text-gray-400 mt-1 uppercase tracking-widest">Narcissistic Personality Inventory</h2>
+    </header>
 
-<transition name="fade" mode="out-in">
+    <!-- Quiz Area -->
+    <main>
+        <transition name="fade" mode="out-in">
 
-<!-- 题目 -->
-<div v-if="!finished" :key="index">
+            <!-- Question Step -->
+            <div v-if="!isFinished" :key="currentIndex">
+                <div class="progress-line mb-12">
+                    <div class="progress-fill" :style="{ width: `${(currentIndex / questions.length) * 100}%` }"></div>
+                </div>
+                <div class="mb-12">
+                    <p class="text-xs text-gray-400 mb-4 tracking-tighter">— QUESTION {{ currentIndex + 1 }} / 16</p>
+                    <p class="text-xs text-gray-300 mb-6 tracking-wide">选择更符合你真实想法的一项</p>
+                    <div class="space-y-4">
+                        <div class="border border-gray-100 p-5 bg-white rounded-sm">
+                            <p class="text-xs text-gray-300 mb-2 tracking-widest">A</p>
+                            <h3 class="text-base md:text-lg leading-relaxed serif font-medium text-gray-800">
+                                {{ questions[currentIndex].a }}
+                            </h3>
+                        </div>
+                        <div class="border border-gray-100 p-5 bg-white rounded-sm">
+                            <p class="text-xs text-gray-300 mb-2 tracking-widest">B</p>
+                            <h3 class="text-base md:text-lg leading-relaxed serif font-medium text-gray-800">
+                                {{ questions[currentIndex].b }}
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <button
+                        @click="handleAnswer(questions[currentIndex].narcScore === 'a' ? 1 : 0)"
+                        class="option-btn w-full py-5 text-left flex justify-between items-center group"
+                    >
+                        <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">选 A ——&nbsp; {{ questions[currentIndex].a.slice(0,12) }}…</span>
+                    </button>
+                    <button
+                        @click="handleAnswer(questions[currentIndex].narcScore === 'b' ? 1 : 0)"
+                        class="option-btn w-full py-5 text-left flex justify-between items-center group"
+                    >
+                        <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">选 B ——&nbsp; {{ questions[currentIndex].b.slice(0,12) }}…</span>
+                    </button>
+                </div>
+                <div class="mt-16 flex justify-between items-center text-xs tracking-widest text-gray-300">
+                    <button @click="prevQuestion" v-if="currentIndex > 0" class="hover:text-black transition-colors">BACK</button>
+                    <span v-else>START</span>
+                    <span>SCORE: {{ currentScore }} / {{ currentIndex }}</span>
+                </div>
+            </div>
 
-<div class="progress-line mb-12">
-<div class="progress-fill"
-:style="{width:(index/questions.length*100)+'%'}">
-</div>
-</div>
+            <!-- Report Step -->
+            <div v-else key="result" class="bg-white p-8 md:p-12 shadow-sm border border-gray-100">
+                <div class="text-center mb-12">
+                    <span class="text-xs tracking-[0.3em] text-gray-400 border-b border-gray-200 pb-2">测评报告书</span>
+                    <h2 class="text-3xl serif mt-8 font-bold text-gray-900">自恋人格特质分析</h2>
+                    <p class="text-sm text-gray-400 mt-2 italic">Assessment ID: {{ assessmentId }}</p>
+                </div>
 
-<p class="text-xs text-gray-400 mb-4">
-QUESTION {{index+1}} / 16
-</p>
+                <!-- Score + Bar Chart -->
+                <div class="flex flex-col md:flex-row items-center justify-around mb-16 gap-10">
+                    <div class="text-center">
+                        <div class="text-xs text-gray-400 mb-2 tracking-widest uppercase">Total Score</div>
+                        <div class="text-6xl serif font-light text-gray-900">{{ finalScore }}</div>
+                        <div class="text-[10px] text-gray-300 mt-1">Range: 0 – 16</div>
+                        <div class="mt-3 text-xs px-3 py-1 inline-block rounded-full"
+                             :class="resultInterpretation.badge">
+                            {{ resultInterpretation.level }}
+                        </div>
+                    </div>
+                    <!-- 维度条形图 -->
+                    <div class="w-full md:w-56 space-y-5">
+                        <div v-for="dim in dimensionBars" :key="dim.label">
+                            <div class="flex justify-between text-[10px] text-gray-400 mb-1">
+                                <span>{{ dim.label }}</span>
+                                <span>{{ dim.score }} / {{ dim.max }}</span>
+                            </div>
+                            <div class="score-bar-track">
+                                <div class="score-bar-fill" :style="{ width: dim.pct + '%', background: dim.color }"></div>
+                            </div>
+                        </div>
+                        <p class="text-[9px] text-gray-300 mt-2 leading-relaxed">
+                            * 基于 Emmons (1987) 四维度框架：权力/权威、表现欲/自我展示、自我优越感、剥削性/特权感
+                        </p>
+                    </div>
+                </div>
 
-<h3 class="text-xl serif mb-12">
-{{questions[index].text}}
-</h3>
+                <!-- Depth Content -->
+                <div class="space-y-10 text-left border-t border-gray-100 pt-10">
+                    <section>
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-4 uppercase">/ 核心性格摘要</h4>
+                        <p class="text-lg serif leading-relaxed text-gray-800 mb-2">{{ resultInterpretation.title }}</p>
+                        <p class="text-sm leading-relaxed text-gray-500">{{ resultInterpretation.desc }}</p>
+                    </section>
 
-<div class="space-y-1">
+                    <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 适应性表现</h4>
+                            <ul class="text-xs text-gray-600 space-y-2">
+                                <li v-for="tag in resultInterpretation.pros" class="flex items-center">
+                                    <span class="w-1 h-1 bg-black mr-2 inline-block flex-shrink-0"></span> {{ tag }}
+                                </li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 关系风险点</h4>
+                            <ul class="text-xs text-gray-600 space-y-2">
+                                <li v-for="tag in resultInterpretation.cons" class="flex items-center">
+                                    <span class="w-1 h-1 bg-gray-300 mr-2 inline-block flex-shrink-0"></span> {{ tag }}
+                                </li>
+                            </ul>
+                        </div>
+                    </section>
 
-<button
-v-for="opt in questions[index].options"
-@click="answer(opt.score)"
-class="option-btn w-full py-5 text-left text-sm text-gray-500 hover:text-black">
+                    <section class="bg-gray-50 p-6 rounded-sm">
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 心理动力学解析</h4>
+                        <p class="text-xs leading-loose text-gray-500 italic">"{{ resultInterpretation.insight }}"</p>
+                    </section>
 
-{{opt.label}}
+                    <section class="border border-gray-100 p-5 rounded-sm">
+                        <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 参考常模</h4>
+                        <p class="text-xs text-gray-500 leading-relaxed">
+                            根据 Ames et al. (2006) 的研究常模，NPI-16 总分均值约为 <strong>6–7 分</strong>（α = .72）。
+                            个体主义文化背景下得分通常高于集体主义文化约 1–2 分。
+                            本测评测量的是<strong>亚临床层面的自恋特质</strong>，不构成任何诊断依据。
+                        </p>
+                    </section>
+                </div>
 
-</button>
+                <div class="mt-16 pt-8 border-t border-gray-100 text-center">
+                    <div class="text-[10px] text-gray-300 uppercase italic">Based on NPI-16 · Ames, Rose & Anderson (2006)</div>
+                    <p class="mt-6 text-xs text-gray-400 tracking-wide">📷 建议截图保存你的测评结果</p>
+                    <p class="text-[10px] text-gray-300 mt-1">报告不会被储存，关闭页面后将无法找回</p>
+                    <a href="index.html" class="mt-6 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
+                        ← Return to Center
+                    </a>
+                </div>
+            </div>
 
-</div>
-
-<div class="mt-16 text-xs text-gray-300">
-SCORE {{totalAnswered}} / 16
-</div>
-
-</div>
-
-<!-- 结果 -->
-<div v-else class="bg-white p-10 border shadow-sm">
-
-<div class="text-center mb-12">
-
-<span class="text-xs tracking-widest text-gray-400">
-NPI REPORT
-</span>
-
-<h2 class="text-4xl serif mt-6 font-bold">
-{{result.level}}
-</h2>
-
-<p class="text-sm text-gray-400">
-自恋人格倾向分析
-</p>
-
-</div>
-
-<div class="flex flex-col items-center gap-8 mb-12">
-
-<div class="w-56 h-56">
-<canvas id="chart"></canvas>
-</div>
-
-<div class="text-center">
-
-<p class="text-lg serif">
-得分 {{score}} / 16
-</p>
-
-<p class="text-sm text-gray-500 mt-2">
-{{result.desc}}
-</p>
-
-</div>
-
-</div>
-
-<div class="space-y-10 text-left border-t pt-10">
-
-<section>
-
-<h4 class="text-xs text-gray-400 mb-4 uppercase">
-/ 特征
-</h4>
-
-<ul class="text-sm space-y-2 text-gray-600">
-
-<li v-for="p in result.traits">
-• {{p}}
-</li>
-
-</ul>
-
-</section>
-
-<section>
-
-<h4 class="text-xs text-gray-400 mb-4 uppercase">
-/ 建议
-</h4>
-
-<p class="text-sm text-gray-500">
-{{result.advice}}
-</p>
-
-</section>
-
-</div>
-
-<div class="mt-12 text-center text-xs text-gray-400">
-
-📷 建议截图保存结果
-
-</div>
-
-</div>
-
-</transition>
-
+        </transition>
+    </main>
 </div>
 
 <script>
-const {createApp,ref,computed,nextTick}=Vue
+const { createApp, ref, computed, nextTick } = Vue;
 
 createApp({
+    setup() {
+        const currentIndex = ref(0);
+        const answers = ref([]);
+        const isFinished = ref(false);
+        const assessmentId = ref(Math.random().toString(36).substr(2, 9).toUpperCase());
 
-setup(){
+        // NPI-16 标准题目（Ames et al., 2006）
+        // narcScore 指哪个选项（a 或 b）为自恋倾向答案，得 1 分
+        // dim: authority=权力/权威, exhibitionism=表现欲, superiority=优越感, entitlement=特权/剥削
+        const questions = [
+            {
+                a: '别人夸我时，我有时会感到不好意思。',
+                b: '我知道自己很好，因为大家都这么说。',
+                narcScore: 'b', dim: 'exhibitionism'
+            },
+            {
+                a: '我更喜欢融入人群，不引人注意。',
+                b: '我喜欢成为众人关注的焦点。',
+                narcScore: 'b', dim: 'exhibitionism'
+            },
+            {
+                a: '我和大多数人没什么两样。',
+                b: '我觉得自己是一个特别的人。',
+                narcScore: 'b', dim: 'superiority'
+            },
+            {
+                a: '我不介意服从他人的指令。',
+                b: '我喜欢拥有对别人的权威。',
+                narcScore: 'b', dim: 'authority'
+            },
+            {
+                a: '当我发现自己在操纵他人时，我会感到不安。',
+                b: '我发现操纵别人对我来说很容易。',
+                narcScore: 'b', dim: 'entitlement'
+            },
+            {
+                a: '我通常能得到应得的尊重。',
+                b: '我坚持要获得我应得的尊重。',
+                narcScore: 'b', dim: 'authority'
+            },
+            {
+                a: '我尽量不炫耀自己。',
+                b: '只要有机会，我就会展示自己。',
+                narcScore: 'b', dim: 'exhibitionism'
+            },
+            {
+                a: '有时我不确定自己在做什么。',
+                b: '我总是知道自己在做什么。',
+                narcScore: 'b', dim: 'superiority'
+            },
+            {
+                a: '有时我会讲一些不错的故事。',
+                b: '每个人都喜欢听我讲故事。',
+                narcScore: 'b', dim: 'exhibitionism'
+            },
+            {
+                a: '我喜欢为他人做一些好事。',
+                b: '我期待他人为我做很多事。',
+                narcScore: 'b', dim: 'entitlement'
+            },
+            {
+                a: '我并不特别喜欢炫耀自己的身体。',
+                b: '我喜欢展示我的身体。',
+                narcScore: 'b', dim: 'exhibitionism'
+            },
+            {
+                a: '我不太擅长影响他人。',
+                b: '我善于让别人按我说的去做。',
+                narcScore: 'b', dim: 'authority'
+            },
+            {
+                a: '我不介意让别人注意到我的成就。',
+                b: '我会努力宣传自己的才能。',
+                narcScore: 'b', dim: 'superiority'
+            },
+            {
+                a: '我不执着于权力。',
+                b: '权力本身令我着迷。',
+                narcScore: 'b', dim: 'authority'
+            },
+            {
+                a: '我通常不从他人那里索取特别待遇。',
+                b: '我期待得到与众不同的特别对待。',
+                narcScore: 'b', dim: 'entitlement'
+            },
+            {
+                a: '我不确定自己是不是一个好的领导者。',
+                b: '我天生就是一个领袖。',
+                narcScore: 'b', dim: 'authority'
+            },
+        ];
 
-const index=ref(0)
-const finished=ref(false)
-const answers=ref([])
+        const handleAnswer = (val) => {
+            answers.value[currentIndex.value] = val;
+            if (currentIndex.value < questions.length - 1) {
+                currentIndex.value++;
+            } else {
+                isFinished.value = true;
+                nextTick(() => setTimeout(() => renderChart(), 300));
+            }
+        };
 
-const questions=[
+        const prevQuestion = () => { if (currentIndex.value > 0) currentIndex.value--; };
 
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我天生适合领导别人",score:1},
-{label:"领导不是我特别追求的角色",score:0}
-]
-},
+        const currentScore = computed(() =>
+            answers.value.reduce((acc, val) => acc + val, 0)
+        );
 
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我喜欢成为注意力中心",score:1},
-{label:"我更喜欢低调",score:0}
-]
-},
+        const finalScore = computed(() => currentScore.value);
 
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我认为自己很特别",score:1},
-{label:"我和大多数人差不多",score:0}
-]
-},
+        // 四维度得分
+        const dimScores = computed(() => {
+            const dims = { authority: 0, exhibitionism: 0, superiority: 0, entitlement: 0 };
+            const counts = { authority: 0, exhibitionism: 0, superiority: 0, entitlement: 0 };
+            answers.value.forEach((val, i) => {
+                if (i < questions.length) {
+                    dims[questions[i].dim] += val;
+                    counts[questions[i].dim]++;
+                }
+            });
+            return { dims, counts };
+        });
 
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我喜欢别人仰慕我",score:1},
-{label:"我不太在意别人是否仰慕我",score:0}
-]
-},
+        const dimensionBars = computed(() => {
+            const { dims, counts } = dimScores.value;
+            return [
+                { label: '权力 / 权威感', score: dims.authority,    max: counts.authority,    pct: counts.authority    ? (dims.authority    / counts.authority)    * 100 : 0, color: '#1a1a1a' },
+                { label: '表现欲 / 自我展示', score: dims.exhibitionism, max: counts.exhibitionism, pct: counts.exhibitionism ? (dims.exhibitionism / counts.exhibitionism) * 100 : 0, color: '#555' },
+                { label: '自我优越感',    score: dims.superiority,  max: counts.superiority,  pct: counts.superiority  ? (dims.superiority  / counts.superiority)  * 100 : 0, color: '#888' },
+                { label: '特权感 / 剥削性', score: dims.entitlement, max: counts.entitlement,  pct: counts.entitlement  ? (dims.entitlement  / counts.entitlement)  * 100 : 0, color: '#bbb' },
+            ];
+        });
 
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我比大多数人更优秀",score:1},
-{label:"我只是普通人",score:0}
-]
-},
+        const resultInterpretation = computed(() => {
+            const s = finalScore.value;
+            if (s >= 12) return {
+                level: '显著高分',
+                badge: 'bg-gray-900 text-white text-[10px]',
+                title: '驱动型自我——权威感与展示欲高度激活',
+                desc: '你在自恋特质上的得分处于显著高区间（Ames 常模 95th 百分位以上）。这意味着你对权威地位有强烈渴望，极度重视外部的认可与赞美，并倾向于将自己视为与众不同的存在。研究表明，这一区间的个体在领导力初期印象上更具优势，但在长期亲密关系与团队合作中往往面临持续挑战。',
+                pros: ['强烈的目标驱动与成就导向', '天然的领导魅力与影响力', '在竞争环境中高度自信', '极强的自我展示与说服能力'],
+                cons: ['对批评的高度敏感与防御性反应', '亲密关系中的共情缺陷', '人际剥削风险（需自我觉察）', '当实际地位与自我期待落差时，情绪脆弱性增加'],
+                insight: '心理动力学视角认为，高度外显的自恋往往是对内在脆弱自体的防御性建构（Kohut, 1971）。你的自信是真实的资产，但若能区分"真实能力"与"对认可的渴望"，将释放更强大的内在稳定性。'
+            };
+            if (s >= 8) return {
+                level: '中高区间',
+                badge: 'bg-gray-700 text-white text-[10px]',
+                title: '自信的社交者——健康自恋与表达欲的平衡态',
+                desc: '你的得分落在中高区间，接近或略高于 Ames 等人研究报告的常模均值（M ≈ 6.8）。这反映出你具备健康的自我肯定与一定程度的领导意愿，同时在特定情境下也会主动争取认可和关注。这是社会功能运作良好的常见人格配置。',
+                pros: ['稳健的自我效能感', '在团体中自然展现存在感', '对自身价值有清晰认知', '适度的竞争意识与进取心'],
+                cons: ['在权威受到挑战时可能过度自我辩护', '偶尔的特权期待影响人际协作', '需留意将"自我重要性"投射到他人期待上'],
+                insight: '亚临床自恋（subclinical narcissism）在这一区间往往是适应性的，与职业成功和领导力呈正相关（Judge et al., 2006）。关键在于保持"自我扩张动机"与"共情容量"之间的动态平衡。'
+            };
+            if (s >= 4) return {
+                level: '中等区间',
+                badge: 'bg-gray-400 text-white text-[10px]',
+                title: '务实的协作者——自我认同稳定，边界感清晰',
+                desc: '你的得分处于常模中间段，呈现出稳定且均衡的自我认同结构。你并不强烈依赖外部认可来维持自我价值感，同时也具备足够的自信参与社会竞争。研究显示，这一区间的个体在长期关系质量与合作信任度上通常表现优异。',
+                pros: ['高情商与共情能力', '在关系中稳定、可预期', '不依赖外部赞美的内在安全感', '良好的团队协作与利他倾向'],
+                cons: ['在高竞争场景中可能显得过于谦让', '在需要自我推销的情境中易退缩', '对权威的渴望较弱，可能错失主动争取机会'],
+                insight: '适度的自恋是人格整合的标志，而非缺陷。你的心理能量更多朝向真实连接而非表演性存在。塞利格曼（Seligman）的积极心理学框架认为，这类人格配置与"蓬勃生长"（flourishing）高度相关。'
+            };
+            return {
+                level: '低分区间',
+                badge: 'bg-gray-200 text-gray-600 text-[10px]',
+                title: '内倾的观察者——他人导向的关系取向',
+                desc: '你的得分处于低区间，远低于常模均值。这反映出你极少将自我需求置于首位，对权威和公众关注的渴望较弱，并倾向于通过关系的深度而非广度来构建自我价值感。虽然这与高度的共情能力和利他精神相关，但也可能带来特定的心理压力。',
+                pros: ['极强的同理心与情绪感知力', '深度信任关系的建立能力', '道德一致性高，不易被功利逻辑影响', '高度的自我批评精神（有时也是挑战）'],
+                cons: ['自我主张不足，易产生边界模糊', '在需要自我展示的职业场景中处于劣势', '过度关注他人感受可能引发情绪耗竭', '对批评的过度敏感（内化方向）'],
+                insight: '低自恋得分者有时面临的挑战不是"太自私"，而是"自我关怀不足"。温尼科特（Winnicott）的客体关系理论提示：健康的自我认同需要一定程度的"良性自恋"作为心理根基，学会珍视自己的需求，与珍视他人的需求同等重要。'
+            };
+        });
 
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我喜欢被关注",score:1},
-{label:"我更喜欢安静环境",score:0}
-]
-},
+        const renderChart = () => {
+            // NPI-16 用维度条形图替代雷达图，无需 canvas 渲染
+        };
 
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我觉得我应该得到特别待遇",score:1},
-{label:"每个人都应该被平等对待",score:0}
-]
-},
-
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我喜欢炫耀自己的成就",score:1},
-{label:"我不喜欢炫耀",score:0}
-]
-},
-
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我希望别人注意到我的成功",score:1},
-{label:"成功是否被注意无所谓",score:0}
-]
-},
-
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我经常幻想巨大成功",score:1},
-{label:"我比较现实",score:0}
-]
-},
-
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我希望成为重要人物",score:1},
-{label:"我不追求地位",score:0}
-]
-},
-
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我喜欢掌控局面",score:1},
-{label:"我不太在意控制",score:0}
-]
-},
-
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我喜欢别人称赞我",score:1},
-{label:"称赞对我不重要",score:0}
-]
-},
-
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我觉得自己很有影响力",score:1},
-{label:"我只是普通影响力",score:0}
-]
-},
-
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我希望别人羡慕我",score:1},
-{label:"我不希望别人羡慕",score:0}
-]
-},
-
-{
-text:"以下哪个更符合你？",
-options:[
-{label:"我认为自己值得被注意",score:1},
-{label:"我不需要特别关注",score:0}
-]
-}
-
-]
-
-function answer(v){
-
-answers.value[index.value]=v
-
-if(index.value<questions.length-1){
-
-index.value++
-
-}else{
-
-finished.value=true
-nextTick(renderChart)
-
-}
-
-}
-
-const totalAnswered=computed(()=>answers.value.length)
-
-const score=computed(()=>answers.value.reduce((a,b)=>a+b,0))
-
-const result=computed(()=>{
-
-if(score.value<=5){
-
-return{
-level:"低自恋倾向",
-desc:"你更倾向谦逊与现实主义，对外部认可需求较低。",
-traits:[
-"较低的自我夸大",
-"较高的共情能力",
-"较少寻求注意"
-],
-advice:"保持健康自信，同时避免过度自我否定。"
-}
-
-}
-
-if(score.value<=10){
-
-return{
-level:"中等自恋倾向",
-desc:"你在自信与谦逊之间保持平衡。",
-traits:[
-"适度自信",
-"有一定竞争意识",
-"重视他人评价"
-],
-advice:"维持这种平衡，同时关注他人的感受。"
-}
-
-}
-
-return{
-
-level:"较高自恋倾向",
-desc:"你具有较强的自我关注与成就驱动力。",
-traits:[
-"高度自信",
-"渴望认可",
-"追求地位与影响力"
-],
-advice:"保持自信，同时注意避免忽视他人的感受。"
-
-}
-
-})
-
-let chart=null
-
-function renderChart(){
-
-const ctx=document.getElementById("chart")
-
-chart=new Chart(ctx,{
-type:"radar",
-data:{
-labels:["Self-focus","Leadership","Recognition","Status"],
-datasets:[{
-data:[
-score.value*6,
-score.value*5,
-score.value*6,
-score.value*5
-],
-backgroundColor:"rgba(0,0,0,0.05)",
-borderColor:"#333"
-}]
-},
-options:{
-plugins:{legend:{display:false}},
-scales:{r:{min:0,max:100,ticks:{display:false}}}
-}
-})
-
-}
-
-return{
-questions,index,answer,totalAnswered,finished,score,result
-}
-
-}
-
-}).mount("#app")
+        return {
+            currentIndex, questions,
+            handleAnswer, prevQuestion,
+            isFinished, finalScore, currentScore,
+            resultInterpretation, assessmentId,
+            dimensionBars,
+        };
+    }
+}).mount('#app');
 </script>
-
 </body>
 </html>
