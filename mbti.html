@@ -7,6 +7,7 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
         body { font-family: 'Noto Sans SC', sans-serif; background: #f7f6f2; color: #333; }
@@ -22,6 +23,9 @@
         .progress-line { height: 1px; background: #e5e5e5; }
         .progress-fill { height: 1px; background: #333; transition: 0.6s; }
         [v-cloak] { display: none; }
+        .save-btn { transition: all 0.3s ease; }
+        .save-btn:hover { background: #333; color: #fff; }
+        .save-btn:active { transform: scale(0.97); }
     </style>
 </head>
 <body class="antialiased">
@@ -240,9 +244,16 @@
 
             <div class="mt-16 pt-8 border-t border-gray-100 text-center">
                 <div class="text-[10px] text-gray-300 uppercase italic">Based on MBTI · Myers &amp; Briggs (1942) · Jung (1921)</div>
-                <p class="mt-6 text-xs text-gray-400 tracking-wide">📷 建议截图保存你的测评结果</p>
-                <p class="text-[10px] text-gray-300 mt-1">报告不会被储存，关闭页面后将无法找回</p>
-                <a href="index.html" class="mt-6 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
+                <button
+                    @click="saveAsImage"
+                    :disabled="isSaving"
+                    class="save-btn mt-6 px-6 py-3 border border-gray-300 text-xs tracking-widest text-gray-500 rounded-sm w-full"
+                >
+                    <span v-if="!isSaving">📷 &nbsp;保存报告为图片</span>
+                    <span v-else class="text-gray-300">生成中，请稍候…</span>
+                </button>
+                <p class="text-[10px] text-gray-300 mt-3">报告不会被储存，关闭页面后将无法找回</p>
+                <a href="index.html" class="mt-4 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
                     ← Return to Center
                 </a>
             </div>
@@ -377,7 +388,33 @@ createApp({
 // renderChart removed
 
         function back() { if (index.value > 0) index.value--; }
-        return { questions, index, options, answer, back, finished, totalAnswered, percent, resultType, report };
+
+        // Save as image
+        const isSaving = Vue.ref(false);
+        async function saveAsImage() {
+            isSaving.value = true;
+            await Vue.nextTick();
+            try {
+                const el = document.querySelector('#app > main .bg-white')
+                         || document.querySelector('#app .bg-white');
+                const canvas = await html2canvas(el, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                });
+                const link = document.createElement('a');
+                link.download = 'MBTI-report.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch(e) {
+                alert('保存失败，请尝试手动截图。');
+            } finally {
+                isSaving.value = false;
+            }
+        }
+
+        return { questions, index, options, answer, back, finished, totalAnswered, percent, resultType, report, isSaving, saveAsImage };
     }
 }).mount('#app');
 </script>
