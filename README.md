@@ -27,5 +27,8 @@ CODES = ABC123:npi16.html,XYZ789:npi16.html,MACH01:mach4.html
 https://dash.cloudflare.com/795ca7cc3c2408e8c30eeb8ef1a1da29/pages/view/psychological-test/ae1b5bfc-1a90-4f2a-a7f5-0281b898519a
 查看详细信息
 
+# 5. 验证码跟新
+部署
+
 
 
