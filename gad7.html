@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAD-7 焦虑症状筛查报告</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+        body { font-family: 'Noto Sans SC', sans-serif; background-color: #f7f6f2; color: #333333; }
+        .serif { font-family: 'Noto Serif SC', serif; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.4s ease, transform 0.4s ease; }
+        .fade-enter-from { opacity: 0; transform: translateY(10px); }
+        .fade-leave-to   { opacity: 0; transform: translateY(-10px); }
+        .option-btn {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .option-btn:hover { background-color: #fff; padding-left: 1.5rem; border-color: #333; }
+        [v-cloak] { display: none; }
+        .progress-line { height: 1px; background: #e5e5e5; }
+        .progress-fill { height: 1px; background: #333; transition: width 0.6s ease; }
+        .save-btn { transition: all 0.3s ease; }
+        .save-btn:hover { background: #333; color: #fff; }
+        .save-btn:active { transform: scale(0.97); }
+        .item-bar-track { height: 5px; background: #f0f0f0; border-radius: 3px; overflow: hidden; }
+        .item-bar-fill  { height: 5px; border-radius: 3px; transition: width 0.9s ease; }
+    </style>
+</head>
+<body class="antialiased">
+
+<script>
+(function () {
+    const p     = new URLSearchParams(location.search);
+    const token = p.get('token') || '';
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const parts = token.split('.');
+    if (parts.length !== 2 || parts[0] !== today) {
+        location.replace('index.html');
+    }
+})();
+</script>
+
+<div id="app" v-cloak class="max-w-xl mx-auto px-6 py-20">
+<transition name="fade" mode="out-in">
+
+    <!-- ── 免责声明页 ── -->
+    <div v-if="showDisclaimer" key="disclaimer" class="bg-white p-8 shadow-sm border border-gray-100">
+        <div class="mb-8 border-l-2 border-black pl-6">
+            <h1 class="text-2xl font-light tracking-widest serif">GAD-7</h1>
+            <h2 class="text-sm text-gray-400 mt-1 uppercase tracking-widest">Generalized Anxiety Disorder Scale</h2>
+        </div>
+        <div class="space-y-4 text-xs text-gray-500 leading-relaxed mb-8">
+            <p class="font-medium text-gray-700 text-sm">请在开始前阅读以下说明</p>
+            <p>GAD-7 是经过广泛验证的广泛性焦虑障碍<strong>筛查工具</strong>，帮助你了解过去两周内焦虑症状的频率与严重程度。</p>
+            <p class="bg-gray-50 p-4 rounded-sm text-gray-600">
+                ⚠️ <strong>重要提示：</strong>本测评结果<strong>不构成任何医学诊断</strong>。GAD-7 是筛查而非诊断工具，得分偏高可能由多种因素引起。如有需要，请寻求专业心理健康服务。
+            </p>
+            <p>如果你目前正在经历严重的焦虑或情绪困扰，可以随时联系：</p>
+            <ul class="space-y-1 pl-4">
+                <li>· 全国心理援助热线：<strong>400-161-9995</strong></li>
+                <li>· 北京心理危机研究与干预中心：<strong>010-82951332</strong></li>
+                <li>· 生命热线：<strong>400-821-1215</strong>（24小时）</li>
+            </ul>
+            <p class="text-gray-400">请如实回答，选择最符合你近两周实际感受的频率。</p>
+        </div>
+        <button @click="showDisclaimer = false"
+                class="w-full py-4 border border-gray-300 text-xs tracking-widest text-gray-600 hover:bg-gray-900 hover:text-white hover:border-gray-900 transition-all">
+            我已了解，开始测评 →
+        </button>
+    </div>
+
+    <!-- ── 答题页 ── -->
+    <div v-else-if="!isFinished" key="quiz">
+        <header class="mb-16 border-l-2 border-black pl-6">
+            <h1 class="text-2xl font-light tracking-widest serif">GAD-7</h1>
+            <h2 class="text-sm text-gray-400 mt-1 uppercase tracking-widest">Generalized Anxiety Disorder Scale</h2>
+        </header>
+
+        <transition name="fade" mode="out-in">
+        <div :key="currentIndex">
+            <div class="progress-line mb-12">
+                <div class="progress-fill" :style="{ width: `${(currentIndex / questions.length) * 100}%` }"></div>
+            </div>
+            <div class="mb-12">
+                <p class="text-xs text-gray-400 mb-3 tracking-tighter">— QUESTION {{ currentIndex + 1 }} / 7</p>
+                <p class="text-xs text-gray-300 mb-5 tracking-wide">在过去两周内，以下情况出现的频率是？</p>
+                <h3 class="text-xl md:text-2xl leading-relaxed serif font-medium text-gray-800">
+                    {{ questions[currentIndex].text }}
+                </h3>
+            </div>
+            <div class="space-y-1">
+                <button
+                    v-for="opt in options" :key="opt.value"
+                    @click="handleAnswer(opt.value)"
+                    class="option-btn w-full py-5 text-left flex justify-between items-center group"
+                >
+                    <span class="text-sm tracking-wide text-gray-500 group-hover:text-black">{{ opt.label }}</span>
+                    <span class="text-xs text-gray-200 group-hover:text-gray-400">{{ opt.value }}</span>
+                </button>
+            </div>
+            <div class="mt-16 flex justify-start items-center text-xs tracking-widest text-gray-300">
+                <button @click="prevQuestion" v-if="currentIndex > 0" class="hover:text-black transition-colors">BACK</button>
+                <span v-else>&nbsp;</span>
+            </div>
+        </div>
+        </transition>
+    </div>
+
+    <!-- ── 结果页 ── -->
+    <div v-else key="result" class="bg-white p-8 md:p-12 shadow-sm border border-gray-100">
+
+        <!-- 标题 -->
+        <div class="text-center mb-12">
+            <span class="text-xs tracking-[0.3em] text-gray-400 border-b border-gray-200 pb-2">测评报告书</span>
+            <h2 class="text-3xl serif mt-8 font-bold text-gray-900">焦虑症状筛查结果</h2>
+            <p class="text-sm text-gray-400 mt-2 italic">Assessment ID: {{ assessmentId }}</p>
+            <p class="text-xs text-gray-300 mt-1">评估时间窗：过去两周</p>
+        </div>
+
+        <!-- 分数 + 分段量尺 -->
+        <div class="mb-16">
+            <div class="flex items-end justify-between mb-6">
+                <div>
+                    <div class="text-xs text-gray-400 uppercase tracking-widest mb-2">Total Score</div>
+                    <div class="text-6xl serif font-light text-gray-900">{{ finalScore }}</div>
+                    <div class="text-[10px] text-gray-300 mt-1">Range: 0 – 21</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-gray-400 uppercase tracking-widest mb-2">Severity Level</div>
+                    <div class="text-lg serif font-medium text-gray-800">{{ interpretation.level }}</div>
+                    <div class="text-[10px] text-gray-400 mt-1">{{ interpretation.cutoff }}</div>
+                </div>
+            </div>
+
+            <!-- 四色分段量尺 -->
+            <div class="space-y-2 mb-6">
+                <div class="flex h-3 rounded-sm overflow-hidden gap-0.5">
+                    <div class="flex-[4] bg-gray-100 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-gray-400">0–4</div>
+                    </div>
+                    <div class="flex-[5] bg-gray-300 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-gray-600">5–9</div>
+                    </div>
+                    <div class="flex-[5] bg-gray-500 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-white">10–14</div>
+                    </div>
+                    <div class="flex-[7] bg-gray-900 relative">
+                        <div class="absolute inset-0 flex items-center justify-center text-[8px] text-white">15–21</div>
+                    </div>
+                </div>
+                <div class="relative h-2">
+                    <div class="absolute top-0 w-0.5 h-2 bg-black transition-all duration-700"
+                         :style="{ left: `calc(${Math.min(finalScore / 21 * 100, 97)}%)` }">
+                    </div>
+                </div>
+                <div class="flex justify-between text-[8px] text-gray-300">
+                    <span>无/轻微</span><span>轻度</span><span>中度</span><span>重度</span>
+                </div>
+            </div>
+
+            <!-- 七题逐项条形图 -->
+            <div class="space-y-2 mt-8">
+                <div class="text-xs text-gray-400 uppercase tracking-widest mb-3">Item Breakdown</div>
+                <div v-for="(q, i) in questions" :key="i" class="flex items-center gap-3">
+                    <span class="text-[9px] text-gray-300 w-4 flex-shrink-0">{{ i + 1 }}</span>
+                    <div class="flex-1 item-bar-track">
+                        <div class="item-bar-fill"
+                             :style="{ width: (answers[i] / 3 * 100) + '%', background: answers[i] >= 2 ? '#333' : '#bbb' }">
+                        </div>
+                    </div>
+                    <span class="text-[9px] text-gray-400 w-3 flex-shrink-0 text-right">{{ answers[i] }}</span>
+                    <span class="text-[9px] text-gray-300 w-20 flex-shrink-0 truncate">{{ q.shortLabel }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="space-y-8 text-left border-t border-gray-100 pt-10">
+
+            <!-- 核心摘要 -->
+            <section>
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-4 uppercase">/ 核心摘要</h4>
+                <p class="text-lg serif leading-relaxed text-gray-800 mb-3">{{ interpretation.title }}</p>
+                <p class="text-sm leading-relaxed text-gray-500">{{ interpretation.desc }}</p>
+            </section>
+
+            <!-- 优势应对 / 需要关注 -->
+            <section class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 可能的触发因素</h4>
+                    <ul class="text-xs text-gray-600 space-y-2">
+                        <li v-for="t in interpretation.triggers" class="flex items-start">
+                            <span class="w-1 h-1 bg-black mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ t }}
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 建议行动</h4>
+                    <ul class="text-xs text-gray-600 space-y-2">
+                        <li v-for="a in interpretation.actions" class="flex items-start">
+                            <span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span>{{ a }}
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- 焦虑与抑郁共病提示 -->
+            <section v-if="finalScore >= 10" class="bg-gray-50 border-l-2 border-gray-300 pl-4 py-4 pr-4">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-2 uppercase">/ 焦虑与抑郁的共病提示</h4>
+                <p class="text-xs text-gray-500 leading-relaxed">
+                    研究发现 GAD-7 与 PHQ-9（抑郁筛查）得分呈强相关（r = 0.70–0.82），焦虑与抑郁在临床上高度共病。如果你同时存在持续的情绪低落、失去兴趣或精力下降等症状，建议在寻求专业评估时一并提及，以获得更全面的支持。
+                </p>
+            </section>
+
+            <!-- 循证干预方法 -->
+            <section v-if="finalScore >= 5">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 循证自我调节方法</h4>
+                <ul class="text-xs text-gray-600 space-y-2">
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span><strong>认知重评：</strong>识别并质疑"灾难化"思维——问自己"最坏的情况真的会发生吗？发生了又如何应对？"</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span><strong>腹式呼吸：</strong>4-7-8 呼吸法（吸气4秒、屏气7秒、呼气8秒）可激活副交感神经，快速降低生理唤醒水平</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span><strong>担忧时间窗：</strong>每天设定固定15分钟"担忧时间"，其他时间出现焦虑想法时主动推迟到这个时段处理</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span><strong>规律运动：</strong>每周150分钟有氧运动对焦虑症状的缓解效果已获多项随机对照研究支持</li>
+                    <li class="flex items-start"><span class="w-1 h-1 bg-gray-300 mt-1.5 mr-2 inline-block flex-shrink-0"></span><strong>减少回避：</strong>焦虑的核心维持机制是回避——循序渐进地面对让你焦虑的情境，是长期缓解的关键</li>
+                </ul>
+            </section>
+
+            <!-- 深度解析 -->
+            <section class="bg-gray-50 p-6 rounded-sm">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 深度解析录</h4>
+                <p class="text-xs leading-loose text-gray-500 italic">"{{ interpretation.insight }}"</p>
+            </section>
+
+            <!-- 参考常模与研究背景 -->
+            <section class="border border-gray-100 p-5 rounded-sm">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 参考常模与研究背景</h4>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    GAD-7 由 Spitzer、Williams、Kroenke 与 Löwe 于 2006 年开发，基于 DSM-IV 广泛性焦虑障碍的核心诊断标准，是全球初级医疗系统中使用最广泛的焦虑筛查工具之一，版权归 Pfizer 所有并免费开放使用。量表包含7个条目，评估最近两周内焦虑症状的频率，采用0–3四点计分，总分0–21分。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    <strong>信效度：</strong>原版研究（N = 2,740，初级医疗门诊）Cronbach's α = 0.92，重测信度 r = 0.83；以 GAD 结构性诊断访谈为效标，临界值10分的灵敏度 89%、特异度 82%（Spitzer et al., 2006）。中文版研究（α = 0.928）和大型中国青少年样本验证（N = 67,281，α 良好）均支持其单维度结构及良好信效度（Shih et al., 2022；Chinese adolescent study, 2021）。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    <strong>分段临界值：</strong>国际标准以5、10、15分划分轻度（5–9）、中度（10–14）、重度（≥15）。近期元分析（12项研究，N = 5,223）建议将筛查临界值调低至8分（灵敏度 0.83，特异度 0.84），以在初级医疗场景中兼顾灵敏度与特异度（Plummer et al., 2016）。本报告参照两套标准综合呈现。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    <strong>普通人群分布：</strong>2019年美国全国健康访谈调查（NHIS）数据显示，约 <strong>6.1%</strong> 的成年人得分 ≥10 分。女性平均得分系统性地高于男性约 1–2 分；中国青少年样本研究也发现女性和年龄较大的青少年得分更高（Chinese adolescent study, 2021）。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                    <strong>广谱筛查效果：</strong>GAD-7 不仅对广泛性焦虑障碍（GAD）有效，对惊恐障碍、社交焦虑障碍和创伤后应激障碍（PTSD）也具有合理的筛查效果（得分≥8时灵敏度 0.77，特异度 0.82），是系统综述中初级医疗场景效率最高的焦虑筛查工具（Spitzer et al., 2006）。
+                </p>
+                <p class="text-xs text-gray-500 leading-relaxed">
+                    <strong>重要局限：</strong>GAD-7 为<em>筛查工具</em>而非诊断工具，得分偏高不等同于确诊 GAD。躯体疾病（如甲亢、心律不齐）、咖啡因摄入过多、药物副作用等均可导致焦虑样症状和得分偏高。如得分 ≥10，强烈建议结合临床评估排除器质性因素并获得专业支持。
+                </p>
+            </section>
+
+            <!-- 专业资源 -->
+            <section class="border border-gray-200 p-5 rounded-sm">
+                <h4 class="text-xs font-bold tracking-widest text-gray-400 mb-3 uppercase">/ 寻求帮助</h4>
+                <div class="text-xs text-gray-500 space-y-2">
+                    <p>如你的得分在中度及以上，或焦虑症状已影响日常生活，请考虑以下资源：</p>
+                    <ul class="space-y-1.5 mt-2">
+                        <li>· <strong class="text-gray-700">全国心理援助热线</strong>：400-161-9995</li>
+                        <li>· <strong class="text-gray-700">北京心理危机研究与干预中心</strong>：010-82951332</li>
+                        <li>· <strong class="text-gray-700">生命热线</strong>：400-821-1215（24小时）</li>
+                        <li>· <strong class="text-gray-700">简单心理 / 壹心理</strong>：在线预约专业心理咨询师</li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+
+        <!-- 底部 -->
+        <div class="mt-16 pt-8 border-t border-gray-100 text-center">
+            <div class="text-[10px] text-gray-300 uppercase italic">Based on GAD-7 · Spitzer, Williams, Kroenke &amp; Löwe (2006)</div>
+            <button
+                @click="saveAsImage"
+                :disabled="isSaving"
+                class="save-btn mt-6 px-6 py-3 border border-gray-300 text-xs tracking-widest text-gray-500 rounded-sm w-full"
+            >
+                <span v-if="!isSaving">📷 &nbsp;保存报告为图片</span>
+                <span v-else class="text-gray-300">生成中，请稍候…</span>
+            </button>
+            <p class="text-[10px] text-gray-300 mt-3">报告不会被储存，关闭页面后将无法找回</p>
+            <a href="index.html" class="mt-4 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
+                ← Return to Center
+            </a>
+        </div>
+
+    </div>
+
+</transition>
+</div>
+
+<script>
+const { createApp, ref, computed, nextTick } = Vue;
+
+createApp({
+    setup() {
+        const showDisclaimer = ref(true);
+        const currentIndex   = ref(0);
+        const answers        = ref([]);
+        const isFinished     = ref(false);
+        const assessmentId   = ref(Math.random().toString(36).substr(2, 9).toUpperCase());
+        const isSaving       = ref(false);
+
+        const options = [
+            { label: '完全没有',       value: 0 },
+            { label: '有几天',         value: 1 },
+            { label: '超过一半的天数', value: 2 },
+            { label: '几乎每天',       value: 3 },
+        ];
+
+        // GAD-7 标准7题（Spitzer et al., 2006）
+        const questions = [
+            { text: '感到紧张、焦虑或烦躁',                         shortLabel: '紧张焦虑' },
+            { text: '无法停止或控制担忧',                           shortLabel: '无法控制担忧' },
+            { text: '对各种各样的事情担忧过多',                     shortLabel: '过度担忧' },
+            { text: '很难放松下来',                                 shortLabel: '难以放松' },
+            { text: '坐立不安，心神不宁',                           shortLabel: '坐立不安' },
+            { text: '容易烦恼或易怒',                               shortLabel: '易烦易怒' },
+            { text: '感到似乎将有可怕的事情发生而感到害怕',         shortLabel: '恐惧感' },
+        ];
+
+        const handleAnswer = (val) => {
+            answers.value[currentIndex.value] = val;
+            if (currentIndex.value < questions.length - 1) {
+                currentIndex.value++;
+            } else {
+                isFinished.value = true;
+            }
+        };
+
+        const prevQuestion = () => { if (currentIndex.value > 0) currentIndex.value--; };
+
+        const finalScore = computed(() =>
+            answers.value.slice(0, 7).reduce((a, v) => a + (v || 0), 0)
+        );
+
+        const interpretation = computed(() => {
+            const s = finalScore.value;
+
+            if (s >= 15) return {
+                level: '重度焦虑症状',
+                cutoff: '15–21 分',
+                title: '症状严重——请尽快寻求专业支持',
+                desc: '你的得分处于重度区间，提示你在过去两周内几乎每天都在经历显著的焦虑症状。这一程度的焦虑已对日常功能造成实质性影响。重度焦虑是可以有效治疗的，认知行为治疗（CBT）和/或药物治疗已被大量随机对照研究证明有效，但需要专业评估后才能确定最适合你的方案。',
+                triggers: [
+                    '持续的不确定感或失控感',
+                    '重大生活压力事件或累积性慢性压力',
+                    '睡眠严重不足导致的神经系统过度激活',
+                    '可能存在的共病抑郁或其他焦虑障碍',
+                ],
+                actions: [
+                    '尽快（建议本周内）联系精神科医生或心理咨询师',
+                    '告知你信任的亲友你目前的状态，不要独自承受',
+                    '暂时减少重大决策，专注于获得支持',
+                    '可拨打援助热线获得即时支持：400-161-9995',
+                ],
+                insight: '重度焦虑往往让人感到被困住了——被自己的思维和身体反应所困。这不是你的错，也不是性格软弱的表现。焦虑是大脑的威胁探测系统过度激活的结果，而这个系统是可以通过专业干预重新校准的。',
+            };
+
+            if (s >= 10) return {
+                level: '中度焦虑症状',
+                cutoff: '10–14 分',
+                title: '焦虑信号明显——建议寻求专业评估',
+                desc: '你的得分提示中度焦虑症状，已达到临床上建议进行专业评估的标准临界值（≥10分）。这意味着焦虑症状在过去两周内已超过半数时间影响到你的状态。在这个分数段，单靠自我调节往往效果有限，专业支持通常是必要的。',
+                triggers: [
+                    '工作或学业压力积累',
+                    '人际关系或家庭压力',
+                    '对未来不确定性的持续担忧',
+                    '完美主义思维模式',
+                ],
+                actions: [
+                    '在近期安排一次心理健康专业评估',
+                    '尝试认知行为治疗（CBT）相关的自助材料或应用',
+                    '识别并记录你的焦虑触发情境',
+                    '规律作息和每日适度运动作为辅助支持',
+                ],
+                insight: '处于中度焦虑区间，你可能仍在"撑着"运转，但内心的消耗已经相当可观。焦虑的核心是对不确定性的不耐受——当我们学会与不确定性共处而非对抗它时，焦虑往往会失去很多力量。',
+            };
+
+            if (s >= 5) return {
+                level: '轻度焦虑症状',
+                cutoff: '5–9 分',
+                title: '轻度波动——值得关注的焦虑状态',
+                desc: '你的得分提示轻度焦虑症状。这一程度的焦虑在面临压力或生活变化时较为普遍，通常可以通过自我调节有效管理。但如果症状持续超过几周或有加重趋势，建议寻求进一步的支持。',
+                triggers: [
+                    '日常生活压力与任务堆积',
+                    '睡眠质量下降或不规律',
+                    '过度使用社交媒体或新闻',
+                    '咖啡因或刺激性物质摄入偏多',
+                ],
+                actions: [
+                    '关注并减少可能的焦虑触发因素',
+                    '建立规律的放松习惯（冥想、呼吸练习、散步）',
+                    '两周后可再次测评追踪变化趋势',
+                    '如症状持续或加重，不要犹豫寻求专业帮助',
+                ],
+                insight: '轻度焦虑往往是信号，而不是敌人——它在提醒你某些事情需要关注。区别在于：焦虑是传递信息的信使，还是已经变成了一个永远拉响警报却没有实质威胁的系统？带着好奇心去观察它，往往比对抗它更有效。',
+            };
+
+            return {
+                level: '无明显症状',
+                cutoff: '0–4 分',
+                title: '目前状态良好——维持心理健康的意识',
+                desc: '你的得分提示在过去两周内没有明显的焦虑症状，处于正常范围内。心理健康需要持续的关注和维护，了解焦虑的早期信号有助于在未来及时识别和应对。',
+                triggers: [
+                    '未来可能的生活压力事件',
+                    '睡眠质量变化',
+                    '重大决策或过渡期',
+                ],
+                actions: [
+                    '继续保持当前的健康生活方式',
+                    '了解焦虑的早期信号以便及时识别',
+                    '在压力较大时期主动使用放松技巧',
+                    '如未来出现变化，可随时重新完成测评',
+                ],
+                insight: '没有焦虑症状并不意味着完全没有压力——而是你目前拥有足够的资源来应对它。心理健康的弹性来自于日常的积累：良好的社会关系、规律的生活节律和对自身情绪的觉察能力。',
+            };
+        });
+
+        // 保存为图片
+        async function saveAsImage() {
+            isSaving.value = true;
+            await nextTick();
+            try {
+                const el = document.querySelector('#app > div.bg-white')
+                         || document.querySelector('#app .bg-white');
+                const canvas = await html2canvas(el, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    logging: false,
+                });
+                const link = document.createElement('a');
+                link.download = 'GAD7-report.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (e) {
+                alert('保存失败，请尝试手动截图。');
+            } finally {
+                isSaving.value = false;
+            }
+        }
+
+        return {
+            showDisclaimer, currentIndex, questions, options,
+            handleAnswer, prevQuestion,
+            isFinished, finalScore, answers,
+            interpretation, assessmentId,
+            isSaving, saveAsImage,
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
