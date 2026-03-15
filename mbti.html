@@ -63,8 +63,9 @@
                     class="option-btn w-full py-5 text-left text-sm text-gray-500 hover:text-black"
                 >{{ opt.label }}</button>
             </div>
-            <div class="mt-16 text-xs text-gray-300 tracking-widest">
-                SCALED SCORE: {{ totalAnswered }} / 30
+            <div class="mt-16 flex justify-start items-center text-xs tracking-widest text-gray-300">
+                <button @click="back()" v-if="index > 0" class="hover:text-black transition-colors">BACK</button>
+                <span v-else>&nbsp;</span>
             </div>
         </div>
 
@@ -148,8 +149,30 @@
                 </section>
             </div>
 
+            <!-- 参考常模与研究背景 -->
+            <div class="mt-10 border-t pt-10">
+                <section class="border border-gray-100 p-5 rounded-sm">
+                    <h4 class="text-xs tracking-widest text-gray-400 mb-3 uppercase">/ 参考常模与研究背景</h4>
+                    <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                        MBTI 由 Katharine Cook Briggs 与 Isabel Briggs Myers 于 1942 年开发，基于 Carl Jung 的心理类型理论。当前主流版本 MBTI-M 已被翻译为 21 种语言，全球累计测试人数超过 <strong>5000 万</strong>，是职场、教育与咨询领域使用最广泛的人格测评工具之一。
+                    </p>
+                    <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                        <strong>信效度数据：</strong>2025 年一项涵盖 1999–2024 年共 193 项研究的心理测量综合分析显示，MBTI-M 各分量表内部一致性系数为 <strong>α = 0.845–0.921</strong>，与六种其他人格量表的聚合效度证据稳健（Erford et al., 2025）。四个维度与大五人格模型（FFM）中的四个维度存在显著相关（McCrae &amp; Costa, 1989）。
+                    </p>
+                    <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                        <strong>重测信度局限：</strong>研究发现约 <strong>50%</strong> 的测试者在九个月内重测时获得相同类型结果，九个月以上重测吻合率降至约 36%。这提示 MBTI 类型并非绝对固定，更接近对当前心理偏好状态的一次快照，而非终身不变的标签。
+                    </p>
+                    <p class="text-xs text-gray-500 leading-relaxed mb-3">
+                        <strong>分布特征：</strong>多项研究发现各维度得分实际呈<strong>正态分布</strong>而非双峰分布——大多数人处于各维度的中间地带。这意味着类型边界（如 INTJ vs INFJ）对于处于中间区域的测试者参考价值较有限，维度倾向的<em>方向</em>比<em>程度</em>更重要。
+                    </p>
+                    <p class="text-xs text-gray-500 leading-relaxed">
+                        <strong>使用建议：</strong>MBTI 适合作为<em>自我探索与沟通工具</em>，不建议用于人才筛选或录用决策。结果应结合个人背景与当前状态综合理解。本测评为非官方简版（30题），结果仅供参考。
+                    </p>
+                </section>
+            </div>
+
             <div class="mt-16 pt-8 border-t border-gray-100 text-center">
-                <div class="text-[10px] text-gray-300 uppercase italic">Authenticated by MBTI Standard System</div>
+                <div class="text-[10px] text-gray-300 uppercase italic">Based on MBTI · Myers &amp; Briggs (1942) · Jung (1921)</div>
                 <p class="mt-6 text-xs text-gray-400 tracking-wide">📷 建议截图保存你的测评结果</p>
                 <p class="text-[10px] text-gray-300 mt-1">报告不会被储存，关闭页面后将无法找回</p>
                 <a href="index.html" class="mt-6 inline-block text-[10px] text-gray-300 hover:text-gray-500 tracking-widest transition-colors uppercase">
@@ -317,7 +340,8 @@ createApp({
             });
         }
 
-        return { questions, index, options, answer, finished, totalAnswered, percent, resultType, report };
+        function back() { if (index.value > 0) index.value--; }
+        return { questions, index, options, answer, back, finished, totalAnswered, percent, resultType, report };
     }
 }).mount('#app');
 </script>
